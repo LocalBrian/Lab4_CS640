@@ -660,6 +660,9 @@ public class Router extends Device
 			return;
 		}
 
+		// private IPv4 tempStoreIPv4;
+		// private Ethernet tempStoreEthernet;
+
 		// Create a new IPv4 packet
 		IPv4 ipv4Packet = new IPv4();
 
@@ -678,6 +681,9 @@ public class Router extends Device
 
 		// Create an Ethernet packet
 		Ethernet etherPacket = new Ethernet();
+
+		// Set the Ethernet type to IPv4
+		etherPacket.setEtherType(Ethernet.TYPE_IPv4);
 
 		// Set the source and destination MAC addresses
 		etherPacket.setSourceMACAddress(iface.getMacAddress().toBytes());
