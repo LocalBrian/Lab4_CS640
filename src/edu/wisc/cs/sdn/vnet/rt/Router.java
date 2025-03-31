@@ -342,13 +342,17 @@ public class Router extends Device
 
 			// Determine the interface based on the matching entry
 			if (matching_entry == null) {
+				// No matching entry found
+				System.out.println("No matching entry found in RIP table.");
 				return null; // No matching entry found
 			}
 			else if (matching_entry.getMetric() == 16) {
+				System.out.println("Entry is unreachable.");
 				return null; // Entry is unreachable
 			}
 			else if (matching_entry.getNextHopAddress() == 0) {
 				// This router is the source of the information
+				System.out.println("This router is the source of the information.");
 				// Return the interface associated with the entry
 				for (Iface iface : this.interfaces.values()) { // entry.getAddress() & entry.getSubnetMask()
 					if ((iface.getIpAddress() & iface.getSubnetMask()) == matching_entry.getAddress()) {
@@ -358,13 +362,15 @@ public class Router extends Device
 				return null; // Entry is unreachable
 			}
 			else {
-			// Based on the entry, find the best interface
-			for (Iface iface : this.interfaces.values()) {
-				if ((iface.getIpAddress() & iface.getSubnetMask()) == matching_entry.getNextHopAddress()) {
-					return iface; // Return the matching interface
+				// Based on the entry, find the best interface
+				for (Iface iface : this.interfaces.values()) {
+					System.out.println("Checking interface: " + iface.toString());
+					if ((iface.getIpAddress() & iface.getSubnetMask()) == matching_entry.getNextHopAddress()) {
+						System.out.println("Found matching interface: " + iface.toString());
+						return iface; // Return the matching interface
+						}
 					}
 				}
-			}
 			return null; // Entry is unreachable
 	}
 
