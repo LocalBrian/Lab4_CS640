@@ -515,7 +515,7 @@ public class Router extends Device
 	    
 		// Starting review of table
 		System.out.println("Reviewing routing table for a single entry in Router.updateRoutingTable.");
-		entry.toString();
+		System.out.println(entry.toString());
 
 		// Extract information from the new entry
 	    int targetSubnet = entry.getAddress();
@@ -540,11 +540,18 @@ public class Router extends Device
 
 				// Check if the gateway is a match
 				if (this.RIPtable.getEntries().get(count).getNextHopAddress() == tempStoreIPv4.getDestinationAddress()) {
-					// This location is the authority, update entry with received data
-					this.RIPtable.getEntries().get(count).setMetric(metric);
-					this.RIPtable.getEntries().get(count).setTime(System.currentTimeMillis());
-					return true;
+					// If there are differences, send update - otherwise no update
+					if (this.RIPtable.getEntries().get(count).getMetric() == metric) {
+						this.RIPtable.getEntries().get(count).setTime(System.currentTimeMillis());
+						return false; // No updates, router already has better path
+					} else {
+						// Metric has changed, overwrite existing entry in the table
+						this.RIPtable.getEntries().get(count).setMetric(metric);
+						this.RIPtable.getEntries().get(count).setTime(System.currentTimeMillis());
+						return true;
+					}
 				} 
+				
 				// This router must compete with another path
 				else{
 					// Check if the entry competes with another path
