@@ -338,7 +338,7 @@ public class Router extends Device
 
 			// Print out matching entry
 			System.out.println("Matching entry in RIP table:");
-			System.out.println(matching_entry.toString());
+			// System.out.println(matching_entry.toString());
 
 			// Determine the interface based on the matching entry
 			if (matching_entry == null) {
@@ -645,7 +645,11 @@ public class Router extends Device
 		}
 		else if ((this.RIPtable.getCommand() == 2) && !broadcast) {
 			// Calculate the target interface based off of destination from tempStoreIPv4
-			Iface targetIface = this.RIPlookup(tempStoreIPv4.getDestinationAddress());
+			Iface targetIface = this.RIPlookup(this.tempStoreInterface.getIpAddress());
+			if (targetIface == null) {
+				System.out.println("No matching route in RIP routing table. Cannot send RIP request.");
+				return;
+			}
 			
 			// Send the packet through a specific interface
 			sendIPv4rip(targetIface, tempStoreIPv4.getSourceAddress(), tempStoreEthernet.getSourceMAC()); 
