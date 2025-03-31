@@ -100,6 +100,16 @@ public class Main
 
 		// BTD - Including handling for if periodic RIP message needs sent
 		if (routeTableFile == null && dev instanceof Router){
+			// Initialize a continue loop to check for periodic RIP messages
+			boolean continueLoop = true;
+			while (continueLoop){
+				// Check if the router needs to send a periodic RIP message
+				((Router)dev).checkLastRIPTime();
+				// Check if the server has closed the connection
+				if (!vnsComm.readFromServer()){
+					continueLoop = false;
+				}
+			}
 			while (vnsComm.readFromServer()){
 				((Router)dev).checkLastRIPTime();
 			}
