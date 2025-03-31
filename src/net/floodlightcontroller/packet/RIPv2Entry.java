@@ -74,7 +74,7 @@ public class RIPv2Entry
     { return this.metric; }
 
     public void setMetric(int metric)
-    { this.metric = metric; }
+    { this.metric = (int) Math.min(metric, 16); }
 
     public long getTime() // BTD -- added for time tracking
     { return this.lastUpdateTime; }
