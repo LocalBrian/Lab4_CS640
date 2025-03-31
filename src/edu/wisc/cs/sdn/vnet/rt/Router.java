@@ -539,7 +539,7 @@ public class Router extends Device
 			if (this.RIPtable.getEntries().get(count).getAddress() == targetSubnet) {
 
 				// Check if the gateway is a match
-				if (this.RIPtable.getEntries().get(count).getNextHopAddress() == tempStoreIPv4.getSourceAddress()) {
+				if (this.RIPtable.getEntries().get(count).getNextHopAddress() == tempStoreIPv4.getDestinationAddress()) {
 					// This location is the authority, update entry with received data
 					this.RIPtable.getEntries().get(count).setMetric(metric);
 					this.RIPtable.getEntries().get(count).setTime(System.currentTimeMillis());
@@ -555,7 +555,7 @@ public class Router extends Device
 						// This is better path, overwrite existing entry in the table
 						this.RIPtable.getEntries().get(count).setMetric(metric);
 						this.RIPtable.getEntries().get(count).setTime(System.currentTimeMillis());
-						this.RIPtable.getEntries().get(count).setNextHopAddress(tempStoreIPv4.getSourceAddress());
+						this.RIPtable.getEntries().get(count).setNextHopAddress(tempStoreIPv4.getDestinationAddress());
 						return true;
 					}
 				}
@@ -570,6 +570,7 @@ public class Router extends Device
 
 			// New an entry for the routing table
 			RIPv2Entry newEntry = new RIPv2Entry(targetSubnet, subnetMask, metric, System.currentTimeMillis());
+			newEntry.setNextHopAddress(tempStoreIPv4.getDestinationAddress()); // Set the next hop address, minght need get source address
 
 			// Update the last update time
 			newEntry.setTime(System.currentTimeMillis());
