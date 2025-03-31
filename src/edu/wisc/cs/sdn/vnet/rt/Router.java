@@ -365,7 +365,7 @@ public class Router extends Device
 				// Based on the entry, find the best interface
 				for (Iface iface : this.interfaces.values()) {
 					System.out.println("Checking interface: " + iface.toString());
-					if ((iface.getIpAddress() & iface.getSubnetMask()) == matching_entry.getNextHopAddress()) {
+					if (iface.getIpAddress() == matching_entry.getNextHopAddress()) {
 						System.out.println("Found matching interface: " + iface.toString());
 						return iface; // Return the matching interface
 						}
