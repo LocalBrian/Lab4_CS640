@@ -645,7 +645,7 @@ public class Router extends Device
 		}
 		else if ((this.RIPtable.getCommand() == 2) && !broadcast) {
 			// Calculate the target interface based off of destination from tempStoreIPv4
-			Iface targetIface = this.routeTable.lookup(tempStoreIPv4.getDestinationAddress()).getInterface();
+			Iface targetIface = this.RIPlookup(tempStoreIPv4.getDestinationAddress());
 			
 			// Send the packet through a specific interface
 			sendIPv4rip(targetIface, tempStoreIPv4.getSourceAddress(), tempStoreEthernet.getSourceMAC()); 
