@@ -30,6 +30,7 @@ public class Router extends Device
 	private long LastRIPCheckTime;
 	private IPv4 tempStoreIPv4;
 	private Ethernet tempStoreEthernet;
+	private Iface tempStoreInterface;
 	
 	/**
 	 * Creates a router for a specific host.
@@ -163,17 +164,20 @@ public class Router extends Device
 			// Temporarily store ethernet and ip packet details
 			this.tempStoreEthernet = etherPacket;
 			this.tempStoreIPv4 = ipPacket;
+			this.tempStoreInterface = inIface;
 
 			if (checkForRIP()) {
 				System.out.println("Received RIP packet. No further processing required in Router.handlePacket.");
 				// Reset the tempStoreEthernet and tempStoreIPv4
 				this.tempStoreEthernet = null;
 				this.tempStoreIPv4 = null;
+				this.tempStoreInterface = null;
 				return; // Perform no further processing if this is a UDP packet for RIP
 			}
 			// Reset the tempStoreEthernet and tempStoreIPv4
 			this.tempStoreEthernet = null;
 			this.tempStoreIPv4 = null;
+			this.tempStoreInterface = null;
 		}
 
 		// Recalculate checksum of the IP packet
@@ -539,7 +543,7 @@ public class Router extends Device
 			if (this.RIPtable.getEntries().get(count).getAddress() == targetSubnet) {
 
 				// Check if the gateway is a match
-				if (this.RIPtable.getEntries().get(count).getNextHopAddress() == tempStoreIPv4.getDestinationAddress()) {
+				if (this.RIPtable.getEntries().get(count).getNextHopAddress() == this.tempStoreInterface.getIpAddress()) {
 					// If there are differences, send update - otherwise no update
 					if (this.RIPtable.getEntries().get(count).getMetric() == metric) {
 						this.RIPtable.getEntries().get(count).setTime(System.currentTimeMillis());
@@ -551,7 +555,7 @@ public class Router extends Device
 						return true;
 					}
 				} 
-				
+
 				// This router must compete with another path
 				else{
 					// Check if the entry competes with another path
@@ -562,7 +566,7 @@ public class Router extends Device
 						// This is better path, overwrite existing entry in the table
 						this.RIPtable.getEntries().get(count).setMetric(metric);
 						this.RIPtable.getEntries().get(count).setTime(System.currentTimeMillis());
-						this.RIPtable.getEntries().get(count).setNextHopAddress(tempStoreIPv4.getDestinationAddress());
+						this.RIPtable.getEntries().get(count).setNextHopAddress(this.tempStoreInterface.getIpAddress());
 						return true;
 					}
 				}
@@ -577,7 +581,7 @@ public class Router extends Device
 
 			// New an entry for the routing table
 			RIPv2Entry newEntry = new RIPv2Entry(targetSubnet, subnetMask, metric, System.currentTimeMillis());
-			newEntry.setNextHopAddress(tempStoreIPv4.getDestinationAddress()); // Set the next hop address, minght need get source address
+			newEntry.setNextHopAddress(this.tempStoreInterface.getIpAddress()); // Set the next hop address, minght need get source address
 
 			// Update the last update time
 			newEntry.setTime(System.currentTimeMillis());
@@ -676,7 +680,7 @@ public class Router extends Device
 
 		// Set the source and destination IP addresses
 		ipv4Packet.setSourceAddress(iface.getIpAddress());
-		ipv4Packet.setDestinationAddress(iface.getSubnetMask());
+		ipv4Packet.setDestinationAddress(dest_ip);
 
 		// Set the protocol to UDP
 		ipv4Packet.setProtocol(IPv4.PROTOCOL_UDP);
