@@ -100,18 +100,29 @@ public class Main
 
 		// BTD - Including handling for if periodic RIP message needs sent
 		if (routeTableFile == null && dev instanceof Router){
-			// Initialize a continue loop to check for periodic RIP messages
-			boolean continueLoop = true;
-			while (continueLoop){
-				// Check if the router needs to send a periodic RIP message
-				((Router)dev).checkLastRIPTime();
-				// Check if the server has closed the connection
-				if (!vnsComm.readFromServer()){
-					continueLoop = false;
+			// Set up seperate thread to handle periodic RIP messages
+			boolean[] continueLoop = {true};
+			Router[] dev_router = {(Router)dev};
+			Thread ripThread = new Thread(() -> {
+				while (continueLoop[0]){
+					// Check if the router needs to send a periodic RIP message
+					try {
+						dev_router[0].checkLastRIPTime();
+						Thread.sleep(1000); // Sleep for 1 second
+					} catch (InterruptedException e) {
+						System.err.println("RIP thread interrupted.");
+						continueLoop[0] = false;
+					}
 				}
-			}
-			while (vnsComm.readFromServer()){
-				((Router)dev).checkLastRIPTime();
+			});
+			// Start the thread
+			ripThread.start();
+			while (vnsComm.readFromServer()){}
+			continueLoop[0] = false;
+			try {
+				ripThread.join(); // Wait for the thread to finish
+			} catch (InterruptedException e) {
+				e.printStackTrace();
 			}
 		}
 		else {while (vnsComm.readFromServer());}
