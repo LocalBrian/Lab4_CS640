@@ -108,7 +108,7 @@ public class Main
 					// Check if the router needs to send a periodic RIP message
 					try {
 						dev_router[0].checkLastRIPTime();
-						Thread.sleep(1000); // Sleep for 1 second
+						Thread.sleep(100); // Sleep for .1 second
 					} catch (InterruptedException e) {
 						System.err.println("RIP thread interrupted.");
 						continueLoop[0] = false;
