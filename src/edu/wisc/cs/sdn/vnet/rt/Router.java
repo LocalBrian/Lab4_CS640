@@ -195,8 +195,8 @@ public class Router extends Device
 		// BTD - need alternative handling for when RIP is active to replace using routeTable.lookup, can borrow code though
 		Iface bestMatch;
 
-		// Check if destination IP is in routing table
-		if (RIPActive) {
+		
+		if (RIPActive) { // If RIP is active, use the RIP table to find the best match
 			bestMatch = RIPlookup(ipPacket.getDestinationAddress());
 			if (bestMatch == null) {
 				System.out.println("No matching route in RIP routing table. Dropping packet.");
@@ -204,7 +204,7 @@ public class Router extends Device
 			}
 
 		}
-		else {
+		else { // Check if destination IP is in routing table if RIP is not active
 			RouteEntry bestRouteMatch = this.routeTable.lookup(ipPacket.getDestinationAddress()); // BTD - only instance of use of routeTable
 			if (bestRouteMatch == null) {
 				System.out.println("No matching route in routing table. Dropping packet.");
@@ -268,11 +268,11 @@ public class Router extends Device
 		
 	}
 
-	/*********************************** Handling for RIP ***********************************/
+	/*********************************** Handling for RIP is below here ***********************************/
 
 	/**
 	 * BTD - Find if their is a matching route in the RIP table for a given IP address
-	 * @param int ipAddress the IP address to check
+	 * @param ip ipAddress the IP address to check
 	 * @return  the matching route entry, or null if not found
 	 */
 
@@ -376,6 +376,8 @@ public class Router extends Device
 
 	/**
 	 * BTD - UDP Packet checking and handling
+	 * This method checks if the incoming packet is a UDP packet destined for RIP, and processes it accordingly.
+	 * @return boolean indicating whether the packet was processed as a RIP packet
 	 */
 	public boolean checkForRIP()
 	{
@@ -431,7 +433,7 @@ public class Router extends Device
 
 	/**
 	 * BTD - Check if new data provided from RIP message
-	 * @param boolean document whether or not response is required
+	 * @param needsResponse boolean indicating if a response is needed (true for request, false for response)
 	 */
 	public void reviewRIPdata(boolean needsResponse)
 	{
@@ -454,10 +456,12 @@ public class Router extends Device
 			}
     	}
 
-		// OR statement handling, if table was updated or a request was sent then send response
+		// if table was updated, broadcast response 
 		if (foundUpdates) {
 			sendRIP(true, RIPv2.COMMAND_RESPONSE); 
-		} else if (needsResponse) {
+		}
+		// it a response is required, send the response 
+		else if (needsResponse) {
 			System.out.println("No updates to table, but a response is required. Sending empty response.");
 			sendRIP(false, RIPv2.COMMAND_RESPONSE); 
 		}
@@ -468,7 +472,7 @@ public class Router extends Device
 	}
 
 	/**
-	 * BTD - Check if Another RIP Request needs sent
+	 * BTD - Check if Another RIP unsolicited packet needs to be sent based on the last time a RIP check was performed.
 	 */
 	public void checkLastRIPTime()
 	{	
@@ -497,6 +501,7 @@ public class Router extends Device
 
 	/**
 	 * BTD - Check for expired entries in RIP table, return true if any updates
+	 * @return boolean indicating whether any entries in the RIP table were found to be expired
 	 */
 	public boolean checkExpiredEntries()
 	{
@@ -510,13 +515,14 @@ public class Router extends Device
 			if (entry.getNextHopAddress() == 0) {
 				entry.setTime(System.currentTimeMillis());
 			}
+			// This entry is already known to be unreachable, no new updates as result and update most  recent time
 			else if (entry.getMetric() == 16) {
-				// This entry is unreachable, set to expired
+				
 				entry.setTime(System.currentTimeMillis());
-			}
+			} // Found an expired entry
 			else if (entry.isExpired(System.currentTimeMillis())) 
 				{
-				foundExpired = true; // Found an expired entry
+				foundExpired = true; 
 				}
 		}
 
@@ -525,7 +531,8 @@ public class Router extends Device
 
 	/**
 	 * Updates the routing table with a new RIP entry.
-	 * Returns true if the table was changed due to the new entry.
+	 * @param entry the RIPv2Entry to be compared against the routing table
+	 * @return boolean indicating whether the routing table was changed due to the new entry
 	 */
 	private boolean updateRoutingTable(RIPv2Entry entry) {
 	    
@@ -541,8 +548,10 @@ public class Router extends Device
 		// Chech if this router is the source
 		int calculatedSubnet = 0;
 		for (Iface iface : this.interfaces.values()) {
+
 			// Reachable subnet calculation
 			calculatedSubnet = iface.getIpAddress() & iface.getSubnetMask();
+
 			if (calculatedSubnet == targetSubnet) { // This router is the source
 				return false; // No updates, this router is the source of the information
 			}					
@@ -556,12 +565,13 @@ public class Router extends Device
 
 				// Check if the gateway is a match
 				if (this.RIPtable.getEntries().get(count).getNextHopAddress() == this.tempStoreInterface.getIpAddress()) {
+
 					// If there are differences, send update - otherwise no update
 					if (this.RIPtable.getEntries().get(count).getMetric() == metric) {
 						this.RIPtable.getEntries().get(count).setTime(System.currentTimeMillis());
 						return false; // No updates, router already has better path
-					} else {
-						// Metric has changed, overwrite existing entry in the table
+					} 
+					else { // Metric has changed, overwrite existing entry in the table						
 						this.RIPtable.getEntries().get(count).setMetric(metric);
 						this.RIPtable.getEntries().get(count).setTime(System.currentTimeMillis());
 						return true;
@@ -572,10 +582,10 @@ public class Router extends Device
 				else{
 					// Check if the entry competes with another path
 					if (this.RIPtable.getEntries().get(count).getMetric() <= metric) {
-						// No updates, router already has better path
+						// No updates, router already has optimum path
 						return false;
-					} else {
-						// This is better path, overwrite existing entry in the table
+					} 
+					else { // This is better path, overwrite existing entry in the table
 						this.RIPtable.getEntries().get(count).setMetric(metric);
 						this.RIPtable.getEntries().get(count).setTime(System.currentTimeMillis());
 						this.RIPtable.getEntries().get(count).setNextHopAddress(this.tempStoreInterface.getIpAddress());
@@ -616,8 +626,8 @@ public class Router extends Device
 
 	/**
 	 * BTD - Send a RIP request
-	 * @param byte command type of RIP message
-	 * @param Iface interface to send the packet on (if this is broadcast, should pass null)
+	 * @param broadcast boolean indicating if the request should be broadcasted to all interfaces
+	 * @param command_type byte indicating the type of command (1 for request, 2 for response)
 	 */
 	public void sendRIP(boolean broadcast, byte command_type)
 	{
@@ -644,6 +654,7 @@ public class Router extends Device
 
 		// Check if message will be a broadcast
 		if (broadcast) {
+
 			// Set broadcast IP address for RIP 224.0.0.9
 			int braodcastIP = IPv4.toIPv4Address("224.0.0.9");
 			// Set broadcast mac address
@@ -656,6 +667,7 @@ public class Router extends Device
 			}
 		}
 		else if ((this.RIPtable.getCommand() == 2) && !broadcast) {
+
 			// Calculate the target interface based off of destination from tempStoreIPv4
 			Iface targetIface = this.RIPlookup(this.tempStoreInterface.getIpAddress());
 			if (targetIface == null) {
@@ -677,19 +689,18 @@ public class Router extends Device
 	}
 
 	/**
-	 * Generate IPv4 for RIP
-	 * @param Iface interface to send the packet on (if this is broadcast, should pass null)
+	 * Generate message to send a RIP packet over IPv4
+	 * @param iface the interface to send the packet on
+	 * @param dest_ip the destination IP address to send the packet to
+	 * @param dest_mac the destination MAC address to send the packet to
 	 */
-	public void sendIPv4rip(Iface iface,int dest_ip, MACAddress dest_mac)
+	public void sendIPv4rip(Iface iface, int dest_ip, MACAddress dest_mac)
 	{
 		// Make sure a valid interface was sent
 		if (iface == null) {
 			System.out.println("Invalid interface in sendIPv4rip. Cannot send RIP request.");
 			return;
 		}
-
-		// private IPv4 tempStoreIPv4;
-		// private Ethernet tempStoreEthernet;
 
 		// Create a new IPv4 packet
 		IPv4 ipv4Packet = new IPv4();
@@ -724,7 +735,7 @@ public class Router extends Device
 
 		// Send the packet
 		System.out.println("Attempting to send RIP message.");
-		if (sendPacket(etherPacket, iface)) // sendPacket(etherPacket, bestMatch.getInterface())
+		if (sendPacket(etherPacket, iface)) 
 		{
 			System.out.println("Packet sent successfully.");
 		}
@@ -737,6 +748,7 @@ public class Router extends Device
 
 	/**
 	 * Generate RIP UDP packet
+	 * @return UDP packet encapsulating the RIP packet
 	 */
 	public UDP generateUDPrip()
 	{
