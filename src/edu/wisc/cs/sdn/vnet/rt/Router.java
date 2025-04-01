@@ -506,7 +506,11 @@ public class Router extends Device
 		// Check if any entries have expired
 		for (RIPv2Entry entry : this.RIPtable.getEntries()) 
 		{
-			if (entry.isExpired(System.currentTimeMillis())) 
+			// Check if the entry is from this device, never expire these and reset timer
+			if (entry.getNextHopAddress() == 0) {
+				entry.setTime(System.currentTimeMillis());
+			}
+			else if (entry.isExpired(System.currentTimeMillis())) 
 				{
 				foundExpired = true; // Found an expired entry
 				}
@@ -514,8 +518,6 @@ public class Router extends Device
 
 		return foundExpired;
 	}
-
-	
 
 	/**
 	 * Updates the routing table with a new RIP entry.
