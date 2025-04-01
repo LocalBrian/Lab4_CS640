@@ -510,6 +510,10 @@ public class Router extends Device
 			if (entry.getNextHopAddress() == 0) {
 				entry.setTime(System.currentTimeMillis());
 			}
+			else if (entry.getMetric() == 16) {
+				// This entry is unreachable, set to expired
+				entry.setTime(System.currentTimeMillis());
+			}
 			else if (entry.isExpired(System.currentTimeMillis())) 
 				{
 				foundExpired = true; // Found an expired entry
