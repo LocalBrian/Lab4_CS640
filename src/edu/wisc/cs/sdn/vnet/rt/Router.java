@@ -481,7 +481,7 @@ public class Router extends Device
 		// Check if the last RIP check was more than 10 seconds ago
 		if ((System.currentTimeMillis() - LastRIPCheckTime) > 10000) {
 			// Send a RIP request to all neighbors
-			sendRIP(true, RIPv2.COMMAND_REQUEST); // Assume this method sends a RIP request to all neighbors
+			sendRIP(true, RIPv2.COMMAND_RESPONSE); // Assume this method sends a RIP request to all neighbors
 			LastRIPCheckTime = System.currentTimeMillis(); // Update the last RIP check time
 			return;
 		}
