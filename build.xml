@@ -8,7 +8,7 @@
             debug="on" />
     </target>
 
-    <target name="dist" depends="compile, dist-tcp">
+    <target name="dist" depends="compile">
         <jar destfile="${ant.project.name}.jar">
             <manifest>
                 <attribute name="Main-Class" 
@@ -18,18 +18,6 @@
             <fileset dir="bin/" />
         </jar>
     </target>
-
-    <target name="dist-tcp" depends="compile">
-        <jar destfile="TCPend.jar">
-            <manifest>
-                <attribute name="Main-Class" 
-                    value="edu.wisc.cs.sdn.vnet.TCPend" />
-                <attribute name="Class-Path" value="." />
-            </manifest>
-            <fileset dir="bin/" />
-        </jar>
-    </target>
-
 	
     <target name="clean">
         <delete dir="bin/" />
