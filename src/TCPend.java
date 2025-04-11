@@ -1,3 +1,6 @@
+import java.io.*;
+import java.nio.file.*;
+
 public class TCPend {
 
     // Flags for which end of TCP this is
@@ -33,8 +36,15 @@ public class TCPend {
         // Parse the arguments
         tcpE.parseArgs(args);
 
+        // Check if the file or folder exists
+        if (!tcpE.startupVerifyFolderFile(tcpE.file_name)) {
+            System.out.println("Error in file verification process.");
+            return;
+        }
+
     }
 
+    /************************************ Code to handle initial startup and parsing of arguments. *********************************************/
     private void parseArgs(String[] args) {
         
         // Default to receiver, will update if argument for sender is received
@@ -82,6 +92,7 @@ public class TCPend {
             System.out.println("TCPend: MTU: " + mtu);
             System.out.println("TCPend: Window Size: " + window_size);
         }
+
     }
 
     /**
@@ -126,4 +137,103 @@ public class TCPend {
         }
         return sb.toString();
     }
+
+    /******************************************** Code to handle file management. **************************************************/
+    
+    /**
+     * This method will be called from the main method to check if the file or folder exists.
+     * @param fileName
+     * @return 
+     */
+    private boolean startupVerifyFolderFile(String fileName) {
+        File file = new File(fileName);
+        if (this.tcp_type == TCP_sender) {
+            if (checkFileExists(file)) {
+                System.out.println("The file " + fileName + " exists, and will be read.");
+                return true;
+            } else {
+                System.out.println("The file " + fileName + " does not exist.");
+                return false;
+            }
+        }
+        else if (this.tcp_type == TCP_receiver) {
+            if (checkFileExists(file)) {
+                System.out.println("The file " + fileName + " already exists, program will not overwrite data.");
+                return false;
+            } 
+            else {
+                // Create the file if it doesn't exist for the receiver
+                try {
+                    if (this.createFile(fileName)) {
+                        System.out.println("The file " + fileName + " was created.");
+                        return true;
+                    } else {
+                        System.out.println("The file " + fileName + " already exists.");
+                        return false;
+                    }
+                } catch (IOException e) {
+                    System.out.println("Error creating file " + fileName + ": " + e.getMessage());
+                    return false;
+                }
+            }
+        }
+        return false; // Something unexpected happened if we  reach here
+    }
+    
+    /**
+     * This method will take a foldername and confirm that the folder exists.
+     * @param folder
+     * @return
+     */
+    private boolean checkFolderExists(File folder) {
+        return (boolean) folder.exists() && folder.isDirectory();
+    }
+
+    /**
+     * This method will take a filename and confirm that the file exists.
+     * @param filePath
+     * @return
+     */
+    private boolean checkFileExists(File file) {
+        return (boolean) file.exists() && file.isFile();
+    }
+
+    /**
+     * If a filepath doesn't exist, create it.
+     * @param filePath
+     * @return true if file was created, false if it already existed or failed to create.
+     * @throws IOException if an error occurs while creating the file.
+     */
+    private boolean createFile(String filePath) throws IOException {
+        File file = new File(filePath);
+        // Create directories if they don't exist
+        File parentDir = file.getParentFile();
+
+        // Check if the parent directory exists, if not create it
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs(); // Create parent directories if they don't exist
+        }
+
+        // Create the file if it doesn't exist
+        if (!file.exists()) {
+            return file.createNewFile();
+        }
+        return false;
+    
+    }  
+
+    /********************** Code to handle data extraction from a file or insertion into a file.*********************************** */
+
+    /**
+     * For the sending side, I need to keep data in the buffer until it is confirmed that it was received - then I can drop it
+     * I will have a temp_buffer that a copy of is added to the end of my real_buffer. Once I have confirmation I can drop it from the list of buffer chunks.
+     * I'll load as much as I can into the outbound buffer, and then send it what I am permitted to send.
+     * I'll have to periodically check if there is space to read things into the buffer.
+     */
+
+    /**
+     * This method will take a file and read the data from it.
+     * @param file
+     * @return
+     */
 }
