@@ -42,6 +42,14 @@ public class TCPend {
             return;
         }
 
+        // Test the read/write file process
+        try {
+            tcpE.testReadWriteFile(tcpE.file_name);
+        } catch (IOException e) {
+            System.out.println("Error in file read/write process: " + e.getMessage());
+            return;
+        }
+
     }
 
     /************************************ Code to handle initial startup and parsing of arguments. *********************************************/
@@ -232,8 +240,91 @@ public class TCPend {
      */
 
     /**
-     * This method will take a file and read the data from it.
-     * @param file
-     * @return
+     * Create a class that will be the file opened for reading.
+     * This class will be used to read the file in chunks, and then return those chunks when requested
      */
+    class FileChunkReader {
+        private File file;
+        private int chunkSize;
+        private int currentPosition;
+
+        public FileChunkReader(File file, int chunkSize) {
+            this.file = file;
+            this.chunkSize = chunkSize;
+            this.currentPosition = 0;
+        }
+
+        public byte[] readNextChunk() throws IOException {
+            // Check if we have reached the end of the file
+            if (currentPosition >= file.length()) {
+                return null; // No more data to read
+            }
+
+            // Calculate the size of the next chunk
+            int remainingBytes = (int) (file.length() - currentPosition);
+            int bytesToRead = Math.min(chunkSize, remainingBytes);
+
+            // Create a byte array to hold the chunk data
+            byte[] chunkData = new byte[bytesToRead];
+
+            // Read the chunk from the file
+            try (FileInputStream fis = new FileInputStream(file)) {
+                fis.skip(currentPosition); // Skip to the current position
+                fis.read(chunkData); // Read the chunk data
+            }
+
+            // Update the current position
+            currentPosition += bytesToRead;
+
+            return chunkData;
+        }
+    }
+
+    /**
+     * This method will take a file and is for testing purposes, fill evaluate ability to read/write bytes to/from a file.
+     * @param filename
+     * @return
+     * @throws IOException
+     */
+    private void testReadWriteFile(String filename) throws IOException {
+        
+        // Create a file object
+        File file = new File(filename);
+        
+        // Create a byte array to hold the data
+        byte[] data = new byte[1024]; // 1 KB buffer
+
+        // Keep track of volume of data written
+        int bytesWritten = 0;
+
+        // update the file name with a 1 prior to the extension
+        String newFileName = filename.substring(0, filename.lastIndexOf('.')) + "_1" + filename.substring(filename.lastIndexOf('.'));
+        File newFile = new File(newFileName);
+        // Create the new file if it doesn't exist
+        this.createFile(newFileName);
+
+        // Loop over file chunk reader until null pulling data
+        FileChunkReader fileChunkReader = new FileChunkReader(file, 1024);
+        byte[] chunk;
+        while ((chunk = fileChunkReader.readNextChunk()) != null) {
+            // Write the chunk to the new file
+            writeByteArrayToFile(newFile, chunk);
+            bytesWritten += chunk.length;
+        }
+        System.out.println("Read " + bytesWritten + " bytes from file.");
+
+    }
+
+    /**
+     * This method will take a byte array and write it to the end of a file.
+     * @param file
+     * @param data
+     * @throws IOException
+     */
+    private void writeByteArrayToFile(File file, byte[] data) throws IOException {
+        // Write the byte array to the end of the file
+        try (FileOutputStream fos = new FileOutputStream(file, true)) {
+            fos.write(data);
+        }
+    }
 }
