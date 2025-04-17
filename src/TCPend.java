@@ -1,5 +1,10 @@
 import java.io.*;
 import java.nio.file.*;
+import java.net.DatagramSocket;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 
 public class TCPend {
 
@@ -18,6 +23,10 @@ public class TCPend {
 
     // Other Attributes
     private boolean extra_logging = true; // Change this flag based on level of logging needed
+    private DatagramSocket socket_in; // Socket for communication in
+    private DatagramSocket socket_out; // Socket for communication out
+
+    /************************** Start Main ****************************************/
 
     public static void main(String[] args) {
         System.out.println("Executing TCPend on host.");
@@ -50,8 +59,65 @@ public class TCPend {
             return;
         }
 
+        // Test the socket connection
+        
 
-        // Waiting to hear from piazza on our limitations on the assignment.
+        
+
+        // Create the datagram packet for sending data, data should be small and printed at destination
+        if (tcpE.tcp_type == tcpE.TCP_sender) {
+
+            // Create the socket for sending data
+            tcpE.socket_out = tcpE.createSocket(tcpE.listening_port);
+            if (tcpE.socket_out == null) {
+                System.out.println("Error creating socket for sending data.");
+                return;
+            }
+
+            System.out.println("Sender mode is active.");
+
+            byte[] data = new byte[1024]; // Example data to send
+            // Fill the data with some example content
+            for (int i = 0; i < data.length; i++) {
+                data[i] = (byte) i;
+            }
+            DatagramPacket packet = tcpE.createPacket(data, 0, data.length, tcpE.target_ipAddress, 8080);
+            try {
+                tcpE.sendPacket(tcpE.socket_out, packet);
+                System.out.println("Packet sent successfully.");
+            } catch (IOException e) {
+                System.out.println("Error sending packet: " + e.getMessage());
+                return;
+            }
+
+        } else {
+            
+            // Create the socket for receiving data
+            tcpE.socket_in = tcpE.createSocket(tcpE.target_port);
+            if (tcpE.socket_in == null) {
+                System.out.println("Error creating socket for receiving data.");
+                return;
+            }
+
+            System.out.println("Receiver mode is active.");
+            byte[] buffer = new byte[1024]; // Buffer for receiving data
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+            try {
+                packet = tcpE.receivePacket(tcpE.socket_in, buffer, buffer.length);
+            } catch (IOException e) {
+                System.out.println("Error receiving packet: " + e.getMessage());
+                return;
+            }
+            System.out.println("Packet received successfully.");
+            System.out.println("Data: " + new String(packet.getData(), 0, packet.getLength()));
+            System.out.println("Sender IP: " + packet.getAddress().getHostAddress());
+            System.out.println("Sender Port: " + packet.getPort());
+            System.out.println("Data Length: " + packet.getLength());
+        }
+        
+        // When running locally on my machine, I can use IP address 127.17.0.1 and any assigned port.
+
+        // Open port with: socat -v UDP-RECV:12345 -
     }
 
     /************************************ Code to handle initial startup and parsing of arguments. *********************************************/
@@ -328,4 +394,82 @@ public class TCPend {
             fos.write(data);
         }
     }
+
+    /******************************** This is the code that will handle sending the packets and creating sockets. *******************************************/
+    /**
+     * This method will create a socket for sending data.
+     * @param port if 0 will assign random port, otherwise attempt with assigned value
+     * @return
+     */
+    private DatagramSocket createSocket(int port) {
+        try {
+            // Create a new DatagramSocket a random port if port = 0
+            if (port == 0) {
+                return new DatagramSocket(); // Use a random port
+            }
+            // Create the socket with the specified port
+            return new DatagramSocket(port);
+        } catch (Exception e) {
+            System.out.println("Error creating socket: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    
+    /**
+     * This method will create a packet for sending data.
+     * @param data
+     * @param offset
+     * @param length
+     * @param address
+     * @param port
+     */
+    private DatagramPacket createPacket(byte[] data, int offset, int length, int address, int port) {
+        // Create a new DatagramPacket with the specified data and address
+        try {
+            return new DatagramPacket(data, offset, length, InetAddress.getByName(TCPStringfromIPv4Address(address)), port);
+        } catch (UnknownHostException e) {
+            System.out.println("Error creating packet: " + e.getMessage());
+            return null;
+        }
+        
+    }
+
+    /**
+     * This method will send a packet using the socket.
+     * @param socket
+     * @param packet
+     * @throws IOException
+     */
+    private void sendPacket(DatagramSocket socket, DatagramPacket packet) throws IOException {
+        // Send the packet using the socket
+        socket.send(packet);
+    }
+
+    /**
+     * This method will close the socket.
+     * @param socket
+     */
+    private void closeSocket(DatagramSocket socket) {
+        if (socket != null && !socket.isClosed()) {
+            socket.close();
+        }
+    }
+
+    /**
+     * This method will listen for incoming packets on the socket.
+     * @param socket
+     * @param buffer
+     * @param length
+     * @return
+     * @throws IOException
+     */
+    private DatagramPacket receivePacket(DatagramSocket socket, byte[] buffer, int length) throws IOException {
+        // Create a new DatagramPacket to receive the data
+        DatagramPacket packet = new DatagramPacket(buffer, length);
+        // Receive the packet using the socket
+        socket.receive(packet);
+        return packet;
+    }
+
 }
