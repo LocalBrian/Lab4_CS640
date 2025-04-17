@@ -50,6 +50,8 @@ public class TCPend {
             return;
         }
 
+
+        // Waiting to hear from piazza on our limitations on the assignment.
     }
 
     /************************************ Code to handle initial startup and parsing of arguments. *********************************************/
@@ -126,7 +128,7 @@ public class TCPend {
         return result;
     }
 
-    /**
+    /** -------------------- I might be able to pull from the code directly, waiting on clarification from piazza.
      * Accepts an IPv4 address and returns of string of the form xxx.xxx.xxx.xxx
      * ie 192.168.0.1
      * Code is taken from IPv4.java, because I am not allowed to directly reference it.
@@ -312,7 +314,6 @@ public class TCPend {
             bytesWritten += chunk.length;
         }
         System.out.println("Read " + bytesWritten + " bytes from file.");
-
     }
 
     /**
