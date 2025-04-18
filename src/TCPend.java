@@ -59,68 +59,121 @@ public class TCPend {
             return;
         }
 
-        // Test the socket connection
-        
-
+        // Create the sockets for sending and receiving data
+        tcpE.socket_out = tcpE.createSocket(0); // Use a random port for sending
+        if (tcpE.socket_out == null) {
+            System.out.println("Error creating socket for sending data.");
+            return;
+        }
+        tcpE.socket_in = tcpE.createSocket(tcpE.listening_port);
+        if (tcpE.socket_in == null) {
+            System.out.println("Error creating socket for receiving data.");
+            return;
+        }
         
 
         // Create the datagram packet for sending data, data should be small and printed at destination
         if (tcpE.tcp_type == tcpE.TCP_sender) {
 
-            // Create the socket for sending data
-            tcpE.socket_out = tcpE.createSocket(tcpE.listening_port);
-            if (tcpE.socket_out == null) {
-                System.out.println("Error creating socket for sending data.");
-                return;
-            }
-
             System.out.println("Sender mode is active.");
 
-            byte[] data = new byte[1024]; // Example data to send
-            // Fill the data with some example content
-            for (int i = 0; i < data.length; i++) {
-                data[i] = (byte) i;
-            }
-            DatagramPacket packet = tcpE.createPacket(data, 0, data.length, tcpE.target_ipAddress, tcpE.target_port);
-            try {
-                tcpE.sendPacket(tcpE.socket_out, packet);
-                System.out.println("Packet sent successfully.");
-            } catch (IOException e) {
-                System.out.println("Error sending packet: " + e.getMessage());
-                return;
-            }
+            // Create File Chunk Reader
+            FileChunkReader fileChunkReader = tcpE.new FileChunkReader(new File(tcpE.file_name), tcpE.mtu);
+            byte[] chunk;
+
+            while (fileChunkReader.hasNextChunk()) {
+                // Read the next chunk of data from the file
+                try {
+                    chunk = fileChunkReader.readNextChunk();
+                } catch (IOException e) {
+                    System.out.println("Error reading file: " + e.getMessage());
+                    return;
+                }
+
+                // Create a packet with the chunk data
+                DatagramPacket packet = tcpE.createPacket(chunk, 0, chunk.length, tcpE.target_ipAddress, tcpE.target_port);
+                if (packet == null) {
+                    System.out.println("Error creating packet.");
+                    return;
+                }
+
+                // Send the packet
+                try {
+                    tcpE.sendPacket(tcpE.socket_out, packet);
+                    System.out.println("Packet sent successfully.");
+                } catch (IOException e) {
+                    System.out.println("Error sending packet: " + e.getMessage());
+                    return;
+                }
+            }    
 
         } else {
-            
-            // Create the socket for receiving data
-            tcpE.socket_in = tcpE.createSocket(tcpE.listening_port);
-            if (tcpE.socket_in == null) {
-                System.out.println("Error creating socket for receiving data.");
-                return;
-            }
-
-            System.out.println("Receiver mode is active.");
-            byte[] buffer = new byte[1024]; // Buffer for receiving data
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-            try {
-                packet = tcpE.receivePacket(tcpE.socket_in, buffer, buffer.length);
-            } catch (IOException e) {
-                System.out.println("Error receiving packet: " + e.getMessage());
-                return;
-            }
-            System.out.println("Packet received successfully.");
-            System.out.println("Data: " + new String(packet.getData(), 0, packet.getLength()));
-            System.out.println("Sender IP: " + packet.getAddress().getHostAddress());
-            System.out.println("Sender Port: " + packet.getPort());
-            System.out.println("Data Length: " + packet.getLength());
+            long endTime = System.currentTimeMillis() + 10000; // Set the end time to ten seconds from now
+            // Keep looping received mode for ten seconds
+            while (System.currentTimeMillis() < endTime) {
+                // Sleep for a short duration to avoid busy waiting
+                System.out.println("Receiver mode is active.");
+                byte[] buffer = new byte[1024]; // Buffer for receiving data
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                try {
+                    packet = tcpE.receivePacket(tcpE.socket_in, buffer, buffer.length);
+                } catch (IOException e) {
+                    System.out.println("Error receiving packet: " + e.getMessage());
+                    return;
+                }
+                System.out.println("Packet received successfully.");
+                System.out.println("Data: " + tcpE.byteArrayToString(packet.getData()));
+                System.out.println("Sender IP: " + packet.getAddress().getHostAddress());
+                System.out.println("Sender Port: " + packet.getPort());
+                System.out.println("Data Length: " + packet.getLength());
+            }    
         }
         
-        // When running locally on my machine, I can use IP address 127.17.0.1 and any assigned port.
-
-        // Open port with: socat -v UDP-RECV:12345 -
+        // Close the sockets
+        tcpE.closeSocket(tcpE.socket_in);
+        tcpE.closeSocket(tcpE.socket_out);
+        System.out.println("Sockets closed successfully.");
+        System.out.println("TCPend execution completed.");
     }
 
-    /******************************** This is the code that will handle sending the packets and creating sockets. *******************************************/
+    /***************************** This code will handle construction of the datagram into properly receivable data. ****************************************/
+
+    /**
+     * This method will take a byte array and convert it to a string.
+     * Don't need inverse, file chunk reader generates byte array.
+     * @param data
+     * @return
+     */
+    private String byteArrayToString(byte[] data) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : data) {
+            sb.append((char) b);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * This method will create a packet for sending data.
+     * @param data
+     * @param offset
+     * @param length
+     * @param address
+     * @param port
+     */
+    private DatagramPacket createPacket(byte[] data, int offset, int length, int address, int port) {
+        // Create a new DatagramPacket with the specified data and address
+        try {
+            return new DatagramPacket(data, offset, length, InetAddress.getByName(TCPStringfromIPv4Address(address)), port);
+        } catch (UnknownHostException e) {
+            System.out.println("Error creating packet: " + e.getMessage());
+            return null;
+        }
+        
+    }
+
+
+
+    /******************************** This is the code that will handle sending of packets and creating sockets. *******************************************/
     /**
      * This method will create a socket for sending data.
      * @param port if 0 will assign random port, otherwise attempt with assigned value
@@ -140,25 +193,6 @@ public class TCPend {
         }
     }
     
-    
-    /**
-     * This method will create a packet for sending data.
-     * @param data
-     * @param offset
-     * @param length
-     * @param address
-     * @param port
-     */
-    private DatagramPacket createPacket(byte[] data, int offset, int length, int address, int port) {
-        // Create a new DatagramPacket with the specified data and address
-        try {
-            return new DatagramPacket(data, offset, length, InetAddress.getByName(TCPStringfromIPv4Address(address)), port);
-        } catch (UnknownHostException e) {
-            System.out.println("Error creating packet: " + e.getMessage());
-            return null;
-        }
-        
-    }
 
     /**
      * This method will send a packet using the socket.
@@ -244,6 +278,10 @@ public class TCPend {
             currentPosition += bytesToRead;
 
             return chunkData;
+        }
+
+        public boolean hasNextChunk() {
+            return currentPosition < file.length();
         }
     }
 
