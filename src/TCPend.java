@@ -52,12 +52,12 @@ public class TCPend {
         }
 
         // Test the read/write file process
-        try {
-            tcpE.testReadWriteFile(tcpE.file_name);
-        } catch (IOException e) {
-            System.out.println("Error in file read/write process: " + e.getMessage());
-            return;
-        }
+        // try {
+        //     tcpE.testReadWriteFile(tcpE.file_name);
+        // } catch (IOException e) {
+        //     System.out.println("Error in file read/write process: " + e.getMessage());
+        //     return;
+        // }
 
         // Create the sockets for sending and receiving data
         tcpE.socket_out = tcpE.createSocket(0); // Use a random port for sending
@@ -105,10 +105,18 @@ public class TCPend {
                     System.out.println("Error sending packet: " + e.getMessage());
                     return;
                 }
+                // Sleep for 1 second to simulate network delay
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    System.out.println("Error sleeping: " + e.getMessage());
+                    return;
+                }
             }    
 
         } else {
             long endTime = System.currentTimeMillis() + 10000; // Set the end time to ten seconds from now
+            File file = new File(tcpE.file_name);
             // Keep looping received mode for ten seconds
             while (System.currentTimeMillis() < endTime) {
                 // Sleep for a short duration to avoid busy waiting
@@ -121,6 +129,15 @@ public class TCPend {
                     System.out.println("Error receiving packet: " + e.getMessage());
                     return;
                 }
+                // Process the received packet
+                try {
+                tcpE.writeByteArrayToFile(file, packet.getData());
+                } catch (IOException e) {
+                    System.out.println("Error writing to file: " + e.getMessage());
+                    return;
+                }
+
+                // Print the received data
                 System.out.println("Packet received successfully.");
                 System.out.println("Data: " + tcpE.byteArrayToString(packet.getData()));
                 System.out.println("Sender IP: " + packet.getAddress().getHostAddress());
@@ -228,6 +245,7 @@ public class TCPend {
         DatagramPacket packet = new DatagramPacket(buffer, length);
         // Receive the packet using the socket
         socket.receive(packet);
+        DatagramPacket return_packet = new DatagramPacket(packet.getData(), packet.getLength();
         return packet;
     }
 
