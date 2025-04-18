@@ -91,7 +91,7 @@ public class TCPend {
                 }
 
                 // Create a packet with the chunk data
-                DatagramPacket packet = tcpE.createPacket(chunk, 0, chunk.length, tcpE.target_ipAddress, tcpE.target_port);
+                DatagramPacket packet = tcpE.createPacket(chunk, 0, fileChunkReader.currentChunkSize, tcpE.target_ipAddress, tcpE.target_port);
                 if (packet == null) {
                     System.out.println("Error creating packet.");
                     return;
@@ -131,7 +131,7 @@ public class TCPend {
                 }
                 // Process the received packet
                 try {
-                tcpE.writeByteArrayToFile(file, packet.getData());
+                tcpE.writeByteArrayToFile(file, packet.getData(), packet.getLength());
                 } catch (IOException e) {
                     System.out.println("Error writing to file: " + e.getMessage());
                     return;
@@ -140,9 +140,9 @@ public class TCPend {
                 // Print the received data
                 System.out.println("Packet received successfully.");
                 System.out.println("Data: " + tcpE.byteArrayToString(packet.getData()));
-                System.out.println("Sender IP: " + packet.getAddress().getHostAddress());
-                System.out.println("Sender Port: " + packet.getPort());
-                System.out.println("Data Length: " + packet.getLength());
+                // System.out.println("Sender IP: " + packet.getAddress().getHostAddress());
+                // System.out.println("Sender Port: " + packet.getPort());
+                // System.out.println("Data Length: " + packet.getLength());
             }    
         }
         
@@ -245,8 +245,8 @@ public class TCPend {
         DatagramPacket packet = new DatagramPacket(buffer, length);
         // Receive the packet using the socket
         socket.receive(packet);
-        DatagramPacket return_packet = new DatagramPacket(packet.getData(), packet.getLength();
-        return packet;
+        DatagramPacket return_packet = new DatagramPacket(packet.getData(), packet.getLength());
+        return return_packet;
     }
 
     /********************** Code to handle data extraction from a file or insertion into a file.*********************************** */
@@ -266,6 +266,7 @@ public class TCPend {
         private File file;
         private int chunkSize;
         private int currentPosition;
+        public int currentChunkSize; // Size of the current chunk read
 
         public FileChunkReader(File file, int chunkSize) {
             this.file = file;
@@ -294,6 +295,7 @@ public class TCPend {
 
             // Update the current position
             currentPosition += bytesToRead;
+            this.currentChunkSize = bytesToRead;
 
             return chunkData;
         }
@@ -331,7 +333,7 @@ public class TCPend {
         byte[] chunk;
         while ((chunk = fileChunkReader.readNextChunk()) != null) {
             // Write the chunk to the new file
-            writeByteArrayToFile(newFile, chunk);
+            writeByteArrayToFile(newFile, chunk, chunk.length);
             bytesWritten += chunk.length;
         }
         System.out.println("Read " + bytesWritten + " bytes from file.");
@@ -341,12 +343,14 @@ public class TCPend {
      * This method will take a byte array and write it to the end of a file.
      * @param file
      * @param data
+     * @param dataLength
      * @throws IOException
      */
-    private void writeByteArrayToFile(File file, byte[] data) throws IOException {
+    private void writeByteArrayToFile(File file, byte[] data, int dataLength) throws IOException {
         // Write the byte array to the end of the file
         try (FileOutputStream fos = new FileOutputStream(file, true)) {
-            fos.write(data);
+            fos.write(data, 0, dataLength);
+            fos.flush();
         }
     }
 
