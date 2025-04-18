@@ -153,7 +153,7 @@ public class TCPend {
         System.out.println("TCPend execution completed.");
     }
 
-    /***************************** This code will handle construction of the datagram into properly receivable data. ****************************************/
+    /****************** This code will handle construction of the datagram into properly receivable data including TCP Header. ********************************/
 
     /**
      * This method will take a byte array and convert it to a string.
@@ -187,6 +187,10 @@ public class TCPend {
         }
         
     }
+
+    /**
+     * Sets the s
+     */
 
 
 
