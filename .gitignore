@@ -1,8 +1,8 @@
-bin
 *.jar
 *.egg-info
 *.pyo
 *.pyc
+*.class
 ip_config
 arp_cache
 rtable.*
