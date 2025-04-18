@@ -89,9 +89,12 @@ public class TCPend {
                     System.out.println("Error reading file: " + e.getMessage());
                     return;
                 }
+                // Create full TCP packet and include header 
+                TCPheader tcpHeader = new TCPheader(0, 0, System.nanoTime(), chunk.length, 1, 0, 0, chunk);
+                tcpHeader.parseReceivedHeader(tcpHeader.returnFullHeader());
 
                 // Create a packet with the chunk data
-                DatagramPacket packet = tcpE.createPacket(chunk, 0, fileChunkReader.currentChunkSize, tcpE.target_ipAddress, tcpE.target_port);
+                DatagramPacket packet = tcpE.createPacket(tcpHeader.returnFullHeader(), 0, tcpHeader.returnFullHeader().length, tcpE.target_ipAddress, tcpE.target_port);
                 if (packet == null) {
                     System.out.println("Error creating packet.");
                     return;
@@ -129,17 +132,20 @@ public class TCPend {
                     System.out.println("Error receiving packet: " + e.getMessage());
                     return;
                 }
+                // Parse the TCP data
+                TCPheader tcpHeader = new TCPheader();
+                tcpHeader.parseReceivedHeader(packet.getData());
                 // Process the received packet
                 try {
-                tcpE.writeByteArrayToFile(file, packet.getData(), packet.getLength());
+                tcpE.writeByteArrayToFile(file, tcpHeader.data, tcpHeader.dataLength, 0);
                 } catch (IOException e) {
                     System.out.println("Error writing to file: " + e.getMessage());
                     return;
                 }
 
                 // Print the received data
-                System.out.println("Packet received successfully.");
-                System.out.println("Data: " + tcpE.byteArrayToString(packet.getData()));
+                // System.out.println("Packet received successfully.");
+                // System.out.println("Data: " + tcpE.byteArrayToString(packet.getData()));
                 // System.out.println("Sender IP: " + packet.getAddress().getHostAddress());
                 // System.out.println("Sender Port: " + packet.getPort());
                 // System.out.println("Data Length: " + packet.getLength());
@@ -331,7 +337,7 @@ public class TCPend {
         byte[] chunk;
         while ((chunk = fileChunkReader.readNextChunk()) != null) {
             // Write the chunk to the new file
-            writeByteArrayToFile(newFile, chunk, chunk.length);
+            writeByteArrayToFile(newFile, chunk, chunk.length, 0);
             bytesWritten += chunk.length;
         }
         System.out.println("Read " + bytesWritten + " bytes from file.");
@@ -339,15 +345,16 @@ public class TCPend {
 
     /**
      * This method will take a byte array and write it to the end of a file.
+     * 
      * @param file
      * @param data
      * @param dataLength
      * @throws IOException
      */
-    private void writeByteArrayToFile(File file, byte[] data, int dataLength) throws IOException {
+    private void writeByteArrayToFile(File file, byte[] data, int dataLength, int startByte) throws IOException {
         // Write the byte array to the end of the file
         try (FileOutputStream fos = new FileOutputStream(file, true)) {
-            fos.write(data, 0, dataLength);
+            fos.write(data, startByte, dataLength);
             fos.flush();
         }
     }

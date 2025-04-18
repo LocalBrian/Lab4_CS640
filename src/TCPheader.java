@@ -5,13 +5,13 @@ public class TCPheader {
     private int byteSequenceNumber;
     private int acknowledgmentNumber;
     private long timestamp;
-    private int dataLength;
+    public int dataLength;
     private int SYN;
     private int FIN;
     private int ACK;
     private int checksum;
-    private byte[] data;
-    private byte[] fullHeader;
+    public byte[] data;
+    public byte[] fullHeader;
 
     public TCPheader() {
         this.byteSequenceNumber = 0;
@@ -45,13 +45,42 @@ public class TCPheader {
 
     }
 
+    // Use this for parsing a received TCP header
+    public void parseReceivedHeader(byte[] fullHeader) {
+        // Parse the received TCP header
+        this.fullHeader = fullHeader;
+        this.byteSequenceNumber = convertByteToInt(fullHeader, 0);
+        this.acknowledgmentNumber = convertByteToInt(fullHeader, 4);
+        this.timestamp = convertByteToLong(fullHeader, 8);
+        this.dataLength = (convertByteToInt(fullHeader, 16) >> 3) & 0xFFFF;
+        this.SYN = (fullHeader[16] >> 2) & 0x1;
+        this.FIN = (fullHeader[16] >> 1) & 0x1;
+        this.ACK = fullHeader[16] & 0x1;
+        this.checksum = convertByteToShort(fullHeader, 22);
+        this.data = new byte[this.dataLength];
+        System.arraycopy(fullHeader, 24, this.data, 0, this.dataLength);
+        // Print the parsed header fields
+        System.out.println("Byte Sequence Number: " + this.byteSequenceNumber);
+        System.out.println("Acknowledgment Number: " + this.acknowledgmentNumber);
+        System.out.println("Timestamp: " + this.timestamp);
+        System.out.println("Data Length: " + this.dataLength);
+        System.out.println("SYN: " + this.SYN);
+        System.out.println("FIN: " + this.FIN);
+        System.out.println("ACK: " + this.ACK);
+        System.out.println("Checksum: " + this.checksum);
+        System.out.println("Data: " + new String(this.data));
+    }
+
     public byte[] returnFullHeader(){
         return this.fullHeader;
     }
 
     private void buildHeaderStart() {
         // Create a byte array to hold the full header
-        this.fullHeader = new byte[24 + this.data.length];
+        this.fullHeader = new byte[24 + this.dataLength];
+        // Print the header length
+        System.out.println("Data length: " + this.data.length);
+        System.out.println("Header length: " + this.fullHeader.length);
         // Set the byte sequence number
         byte[] byteSequenceNumberArray = convertIntToByte(this.byteSequenceNumber);
         System.arraycopy(byteSequenceNumberArray, 0, this.fullHeader, 0, byteSequenceNumberArray.length);
@@ -90,6 +119,32 @@ public class TCPheader {
         // Reset the checksum bytes to 0
         this.checksum = 0;
     }
+
+    public int convertByteToInt(byte[] byteArray, int startIndex) {
+        // Convert a byte array to an integer
+        int value = 0;
+        for (int i = 0; i < 4; i++) {
+            value |= (byteArray[startIndex + i] & 0xFF) << (8 * (3 - i));
+        }
+        return value;
+    }
+    public long convertByteToLong(byte[] byteArray, int startIndex) {
+        // Convert a byte array to a long
+        long value = 0;
+        for (int i = 0; i < 8; i++) {
+            value |= ((long) (byteArray[startIndex + i] & 0xFF)) << (8 * (7 - i));
+        }
+        return value;
+    }
+    public short convertByteToShort(byte[] byteArray, int startIndex) {
+        // Convert a byte array to a short
+        short value = 0;
+        for (int i = 0; i < 2; i++) {
+            value |= (byteArray[startIndex + i] & 0xFF) << (8 * (1 - i));
+        }
+        return value;
+    }
+
 
     public byte[] convertIntToByte(int value) {
         // Convert an integer to a byte array
