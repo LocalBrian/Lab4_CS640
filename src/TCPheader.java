@@ -47,6 +47,9 @@ public class TCPheader {
 
     // Use this for parsing a received TCP header
     public void parseReceivedHeader(byte[] fullHeader) {
+        // Set the data passed in
+        this.fullHeader = fullHeader;
+        
         // Validate the checksum
         byte[] calculatedChecksum = new byte[2];
         calculatedChecksum = calculateChecksum();
@@ -56,9 +59,11 @@ public class TCPheader {
         }
         // Checksum is valid
         System.out.println("Checksum is valid");
+        // Print the checksum array bits
+        System.out.println("Checksum array: ");
+        printByteBits(calculatedChecksum);
         
         // Parse the received TCP header
-        this.fullHeader = fullHeader;
         this.byteSequenceNumber = convertByteToInt(fullHeader, 0);
         this.acknowledgmentNumber = convertByteToInt(fullHeader, 4);
         this.timestamp = convertByteToLong(fullHeader, 8);
@@ -211,10 +216,9 @@ public class TCPheader {
         complementCheckSum[1] = (byte) (~checksumArray2);
 
         
-        this.checksum = convertByteToShort(complementCheckSum, 0);
+        this.checksum = complementCheckSum;
         
         // Return the computated value
-        System.out.println("Calculated Complement Checksum: " + this.checksum);
         return complementCheckSum;
         
 
