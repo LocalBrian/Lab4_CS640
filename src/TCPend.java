@@ -45,20 +45,6 @@ public class TCPend {
         // Parse the arguments
         tcpE.parseArgs(args);
 
-        // Check if the file or folder exists
-        if (!tcpE.startupVerifyFolderFile(tcpE.file_name)) {
-            System.out.println("Error in file verification process.");
-            return;
-        }
-
-        // Test the read/write file process
-        // try {
-        //     tcpE.testReadWriteFile(tcpE.file_name);
-        // } catch (IOException e) {
-        //     System.out.println("Error in file read/write process: " + e.getMessage());
-        //     return;
-        // }
-
         // Create the sockets for sending and receiving data
         tcpE.socket_out = tcpE.createSocket(0); // Use a random port for sending
         if (tcpE.socket_out == null) {
@@ -78,8 +64,14 @@ public class TCPend {
             System.out.println("Sender mode is active.");
 
             // Create File Chunk Reader
-            FileChunkReader fileChunkReader = tcpE.new FileChunkReader(new File(tcpE.file_name), tcpE.mtu);
+            TCPfilehandling fileChunkReader = new TCPfilehandling(tcpE.file_name, tcpE.mtu);
             byte[] chunk;
+
+            // Verify file exists
+            if (!fileChunkReader.startupVerifyFolderFile(false)) {
+                System.out.println("File does not exist.");
+                return;
+            }
 
             while (fileChunkReader.hasNextChunk()) {
                 // Read the next chunk of data from the file
@@ -119,7 +111,12 @@ public class TCPend {
 
         } else {
             long endTime = System.currentTimeMillis() + 10000; // Set the end time to ten seconds from now
-            File file = new File(tcpE.file_name);
+            TCPfilehandling fileChunkWriter = new TCPfilehandling(tcpE.file_name);
+            // Verify file exists
+            if (!fileChunkWriter.startupVerifyFolderFile(true)) {
+                System.out.println("File does not exist.");
+                return;
+            }
             // Keep looping received mode for ten seconds
             while (System.currentTimeMillis() < endTime) {
                 // Sleep for a short duration to avoid busy waiting
@@ -137,7 +134,7 @@ public class TCPend {
                 tcpHeader.parseReceivedHeader(packet.getData());
                 // Process the received packet
                 try {
-                tcpE.writeByteArrayToFile(file, tcpHeader.data, tcpHeader.dataLength, 0);
+                fileChunkWriter.writeByteArrayToFile(tcpHeader.data, tcpHeader.dataLength, 0);
                 } catch (IOException e) {
                     System.out.println("Error writing to file: " + e.getMessage());
                     return;
@@ -253,196 +250,6 @@ public class TCPend {
         return return_packet;
     }
 
-    /********************** Code to handle data extraction from a file or insertion into a file.*********************************** */
-
-    /**
-     * For the sending side, I need to keep data in the buffer until it is confirmed that it was received - then I can drop it
-     * I will have a temp_buffer that a copy of is added to the end of my real_buffer. Once I have confirmation I can drop it from the list of buffer chunks.
-     * I'll load as much as I can into the outbound buffer, and then send it what I am permitted to send.
-     * I'll have to periodically check if there is space to read things into the buffer.
-     */
-
-    /**
-     * Create a class that will be the file opened for reading.
-     * This class will be used to read the file in chunks, and then return those chunks when requested
-     */
-    class FileChunkReader {
-        private File file;
-        private int chunkSize;
-        private int currentPosition;
-        public int currentChunkSize; // Size of the current chunk read
-
-        public FileChunkReader(File file, int chunkSize) {
-            this.file = file;
-            this.chunkSize = chunkSize;
-            this.currentPosition = 0;
-        }
-
-        public byte[] readNextChunk() throws IOException {
-            // Check if we have reached the end of the file
-            if (currentPosition >= file.length()) {
-                return null; // No more data to read
-            }
-
-            // Calculate the size of the next chunk
-            int remainingBytes = (int) (file.length() - currentPosition);
-            int bytesToRead = Math.min(chunkSize, remainingBytes);
-
-            // Create a byte array to hold the chunk data
-            byte[] chunkData = new byte[bytesToRead];
-
-            // Read the chunk from the file
-            try (FileInputStream fis = new FileInputStream(file)) {
-                fis.skip(currentPosition); // Skip to the current position
-                fis.read(chunkData); // Read the chunk data
-            }
-
-            // Update the current position
-            currentPosition += bytesToRead;
-            this.currentChunkSize = bytesToRead;
-
-            return chunkData;
-        }
-
-        public boolean hasNextChunk() {
-            return currentPosition < file.length();
-        }
-    }
-
-    /**
-     * This method will take a file and is for testing purposes, fill evaluate ability to read/write bytes to/from a file.
-     * @param filename
-     * @return
-     * @throws IOException
-     */
-    private void testReadWriteFile(String filename) throws IOException {
-        
-        // Create a file object
-        File file = new File(filename);
-        
-        // Create a byte array to hold the data
-        byte[] data = new byte[1024]; // 1 KB buffer
-
-        // Keep track of volume of data written
-        int bytesWritten = 0;
-
-        // update the file name with a 1 prior to the extension
-        String newFileName = filename.substring(0, filename.lastIndexOf('.')) + "_1" + filename.substring(filename.lastIndexOf('.'));
-        File newFile = new File(newFileName);
-        // Create the new file if it doesn't exist
-        this.createFile(newFileName);
-
-        // Loop over file chunk reader until null pulling data
-        FileChunkReader fileChunkReader = new FileChunkReader(file, 1024);
-        byte[] chunk;
-        while ((chunk = fileChunkReader.readNextChunk()) != null) {
-            // Write the chunk to the new file
-            writeByteArrayToFile(newFile, chunk, chunk.length, 0);
-            bytesWritten += chunk.length;
-        }
-        System.out.println("Read " + bytesWritten + " bytes from file.");
-    }
-
-    /**
-     * This method will take a byte array and write it to the end of a file.
-     * 
-     * @param file
-     * @param data
-     * @param dataLength
-     * @throws IOException
-     */
-    private void writeByteArrayToFile(File file, byte[] data, int dataLength, int startByte) throws IOException {
-        // Write the byte array to the end of the file
-        try (FileOutputStream fos = new FileOutputStream(file, true)) {
-            fos.write(data, startByte, dataLength);
-            fos.flush();
-        }
-    }
-
-    /******************************************** Code to handle file management. **************************************************/
-    
-    /**
-     * This method will be called from the main method to check if the file or folder exists.
-     * @param fileName
-     * @return 
-     */
-    private boolean startupVerifyFolderFile(String fileName) {
-        File file = new File(fileName);
-        if (this.tcp_type == TCP_sender) {
-            if (checkFileExists(file)) {
-                System.out.println("The file " + fileName + " exists, and will be read.");
-                return true;
-            } else {
-                System.out.println("The file " + fileName + " does not exist.");
-                return false;
-            }
-        }
-        else if (this.tcp_type == TCP_receiver) {
-            if (checkFileExists(file)) {
-                System.out.println("The file " + fileName + " already exists, program will not overwrite data.");
-                return false;
-            } 
-            else {
-                // Create the file if it doesn't exist for the receiver
-                try {
-                    if (this.createFile(fileName)) {
-                        System.out.println("The file " + fileName + " was created.");
-                        return true;
-                    } else {
-                        System.out.println("The file " + fileName + " already exists.");
-                        return false;
-                    }
-                } catch (IOException e) {
-                    System.out.println("Error creating file " + fileName + ": " + e.getMessage());
-                    return false;
-                }
-            }
-        }
-        return false; // Something unexpected happened if we  reach here
-    }
-    
-    /**
-     * This method will take a foldername and confirm that the folder exists.
-     * @param folder
-     * @return
-     */
-    private boolean checkFolderExists(File folder) {
-        return (boolean) folder.exists() && folder.isDirectory();
-    }
-
-    /**
-     * This method will take a filename and confirm that the file exists.
-     * @param filePath
-     * @return
-     */
-    private boolean checkFileExists(File file) {
-        return (boolean) file.exists() && file.isFile();
-    }
-
-    /**
-     * If a filepath doesn't exist, create it.
-     * @param filePath
-     * @return true if file was created, false if it already existed or failed to create.
-     * @throws IOException if an error occurs while creating the file.
-     */
-    private boolean createFile(String filePath) throws IOException {
-        File file = new File(filePath);
-        // Create directories if they don't exist
-        File parentDir = file.getParentFile();
-
-        // Check if the parent directory exists, if not create it
-        if (parentDir != null && !parentDir.exists()) {
-            parentDir.mkdirs(); // Create parent directories if they don't exist
-        }
-
-        // Create the file if it doesn't exist
-        if (!file.exists()) {
-            return file.createNewFile();
-        }
-        return false;
-    
-    }
-
     /************************************ Code to handle initial startup and parsing of arguments. *********************************************/
     private void parseArgs(String[] args) {
         
@@ -497,7 +304,7 @@ public class TCPend {
     /**
      * Accepts an IPv4 address of the form xxx.xxx.xxx.xxx, ie 192.168.0.1 and
      * returns the corresponding 32 bit integer.
-     * Code is taken from IPv4.java, because I am not allowed to directly reference it.
+     * Code is taken from IPv4.java, from class.
      * @param ipAddress
      * @return
      */
@@ -517,10 +324,10 @@ public class TCPend {
         return result;
     }
 
-    /** -------------------- I might be able to pull from the code directly, waiting on clarification from piazza.
+    /** 
      * Accepts an IPv4 address and returns of string of the form xxx.xxx.xxx.xxx
      * ie 192.168.0.1
-     * Code is taken from IPv4.java, because I am not allowed to directly reference it.
+     * Code is taken from IPv4.java, from class.
      * 
      * @param ipAddress
      * @return
