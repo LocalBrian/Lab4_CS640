@@ -9,7 +9,7 @@ public class TCPheader {
     private int SYN;
     private int FIN;
     private int ACK;
-    private int checksum;
+    private byte[] checksum;
     public byte[] data;
     public byte[] fullHeader;
 
@@ -21,7 +21,7 @@ public class TCPheader {
         this.SYN = 0;
         this.ACK = 0;
         this.FIN = 0;
-        this.checksum = 0;
+        this.checksum = new byte[2];
         this.data = new byte[0];
     }
 
@@ -47,6 +47,16 @@ public class TCPheader {
 
     // Use this for parsing a received TCP header
     public void parseReceivedHeader(byte[] fullHeader) {
+        // Validate the checksum
+        byte[] calculatedChecksum = new byte[2];
+        calculatedChecksum = calculateChecksum();
+        if (calculatedChecksum[0] != 0 || calculatedChecksum[1] != 0) {
+            System.out.println("Checksum mismatch");
+            return;
+        }
+        // Checksum is valid
+        System.out.println("Checksum is valid");
+        
         // Parse the received TCP header
         this.fullHeader = fullHeader;
         this.byteSequenceNumber = convertByteToInt(fullHeader, 0);
@@ -56,7 +66,7 @@ public class TCPheader {
         this.SYN = (fullHeader[16] >> 2) & 0x1;
         this.FIN = (fullHeader[16] >> 1) & 0x1;
         this.ACK = fullHeader[16] & 0x1;
-        this.checksum = convertByteToShort(fullHeader, 22);
+        
         this.data = new byte[this.dataLength];
         System.arraycopy(fullHeader, 24, this.data, 0, this.dataLength);
         // Print the parsed header fields
@@ -67,7 +77,6 @@ public class TCPheader {
         System.out.println("SYN: " + this.SYN);
         System.out.println("FIN: " + this.FIN);
         System.out.println("ACK: " + this.ACK);
-        System.out.println("Checksum: " + this.checksum);
         System.out.println("Data: " + new String(this.data));
     }
 
@@ -92,11 +101,27 @@ public class TCPheader {
         System.arraycopy(timestampArray, 0, this.fullHeader, 8, timestampArray.length);
         // Set the data length and statuses
         setLengthAndStatus();
-        // Set the checksum
-        byte[] checksumArray = convertIntToByte(0);
-        System.arraycopy(checksumArray, 0, this.fullHeader, 20, checksumArray.length);
+        // Add 2 bytes of padding
+        byte[] padding = new byte[2];
+        padding = convertShortToByte((short) 0);
+        System.arraycopy(padding, 0, this.fullHeader, 20, padding.length);
+        // Set the checksum to 0
+        byte[] checksumArray = convertShortToByte((short) 0);
+        System.arraycopy(checksumArray, 0, this.fullHeader, 22, checksumArray.length);
         // Set the data
         System.arraycopy(this.data, 0, this.fullHeader, 24, this.data.length);
+        // Calculate the checksum -- also updates the checksum within the header
+        checksumArray = calculateChecksum();
+        System.arraycopy(checksumArray, 0, this.fullHeader, 22, checksumArray.length);
+        // Print the checksum array bits
+        System.out.println("Checksum array before calculation: ");
+        printByteBits(checksumArray);
+
+        // For testing purposes do the checksum again, should now be 0
+        byte[] checksumArray2 = calculateChecksum();
+        // Print the checksum array bits
+        System.out.println("Checksum array after calculation: ");
+        printByteBits(checksumArray2);
     }
 
     public void setLengthAndStatus() {
@@ -115,9 +140,84 @@ public class TCPheader {
         System.arraycopy(lengthStatusArray, 0, this.fullHeader, 16, lengthStatusArray.length);
     }
 
-    public void calculateChecksum() {
-        // Reset the checksum bytes to 0
-        this.checksum = 0;
+    /**  
+     * Calculate the checksum of the TCP header
+     * The checksum is calculated by summing the 16-bit words of the header
+     * and taking the one's complement of the sum.
+     * This will return 0 if the checksum is correct.
+     * The checksum return the complement checksum if this is a initial calculation.
+     */
+    public byte[] calculateChecksum() {
+        
+        // Set the checksum bytes to 0
+        short checksumArray1 = 0;
+        short checksumArray2 = 0;
+
+        // Needed initializations
+        short byte1 = 0;
+        short byte2 = 0;
+
+        // loop over 16 bits of the header data, 2 bytes at a time
+        // if there are less than 2 bytes left, pad with 0s
+        for (int i = 0; i < this.fullHeader.length; i += 2) {
+            // Get the second byte first
+            if (i + 1 < this.fullHeader.length) {
+                // Get the second byte
+                byte2 = (short) this.fullHeader[i + 1];
+                byte2 &= 0x00FF; // Mask to get the last 8 bits
+            } else {
+                // Pad with 0s
+                byte2 = 0;
+            }
+
+            // Add byte2 and checksumArray2
+            checksumArray2 += byte2;
+
+            // Check for overflow
+            if (checksumArray2 > 0x00FF) {
+                checksumArray1 += (checksumArray2 & 0xFF00) >>> 8;
+                checksumArray2 &= 0x00FF;
+            } 
+            
+            // Get the first byte
+            byte1 = (short) this.fullHeader[i];
+            byte1 &= 0x00FF; // Mask to get the last 8 bits
+
+            // Add byte1 and checksumArray1
+            checksumArray1 += byte1;
+
+            // Check for overflow
+            if (checksumArray1 > 0x00FF) {
+                checksumArray2 += (checksumArray1 & 0xFF00) >>> 8;
+                checksumArray1 &= 0x00FF;
+            } 
+        }
+
+        // Check if there is overflow in checksumArray2
+        if (checksumArray2 > 0x00FF) {
+            checksumArray1 += (checksumArray2 & 0xFF00) >>> 8;
+            checksumArray2 &= 0x00FF;
+        }
+        // Check if there is overflow in checksumArray1
+        if (checksumArray1 > 0x00FF) {
+            checksumArray2 += (checksumArray1 & 0xFF00) >>> 8;
+            checksumArray1 &= 0x00FF;
+        }
+
+        // Combine the two checksums, 1 is the high bytes and 2 is the low bytes
+        // Convert the checksum to a byte array
+        byte[] complementCheckSum = new byte[2];
+        complementCheckSum[0] = (byte) (~checksumArray1);
+        complementCheckSum[1] = (byte) (~checksumArray2);
+
+        
+        this.checksum = convertByteToShort(complementCheckSum, 0);
+        
+        // Return the computated value
+        System.out.println("Calculated Complement Checksum: " + this.checksum);
+        return complementCheckSum;
+        
+
     }
 
     public int convertByteToInt(byte[] byteArray, int startIndex) {
@@ -150,7 +250,7 @@ public class TCPheader {
         // Convert an integer to a byte array
         byte[] byteArray = new byte[4];
         for (int i = 0; i < 4; i++) {
-            byteArray[i] = (byte) ((value >> (8 * (3 - i))) & 0xFF);
+            byteArray[i] = (byte) ((value >>> (8 * (3 - i))) & 0xFF);
         }
         return byteArray;
     }
@@ -159,17 +259,30 @@ public class TCPheader {
         // Convert a long to a byte array
         byte[] byteArray = new byte[8];
         for (int i = 0; i < 8; i++) {
-            byteArray[i] = (byte) ((value >> (8 * (7 - i))) & 0xFF);
+            byteArray[i] = (byte) ((value >>> (8 * (7 - i))) & 0xFF);
         }
         return byteArray;
     }
 
-    public byte[] converShortToByte(short value) {
+    public byte[] convertShortToByte(short value) {
         // Convert a short to a byte array
         byte[] byteArray = new byte[2];
         for (int i = 0; i < 2; i++) {
-            byteArray[i] = (byte) ((value >> (8 * (1 - i))) & 0xFF);
+            byteArray[i] = (byte) ((value >>> (8 * (1 - i))) & 0xFF);
         }
         return byteArray;
     }
+
+    /**
+     * Print bytes as text
+     * @param bytes
+     */
+    public void printByteBits(byte[] bytes) {
+        for (int i = 0; i < bytes.length; i++) {
+            // Mask with 0xFF to avoid sign extension and get unsigned value
+            String bits = String.format("%8s", Integer.toBinaryString(bytes[i] & 0xFF)).replace(' ', '0');
+            System.out.println("byte[" + i + "]: " + bits);
+        }
+    }
+
 }
