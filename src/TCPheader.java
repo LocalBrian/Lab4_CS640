@@ -2,14 +2,14 @@
 
 
 public class TCPheader {
-    private int byteSequenceNumber;
-    private int acknowledgmentNumber;
-    private long timestamp;
+    public int byteSequenceNumber;
+    public int acknowledgmentNumber;
+    public long timestamp;
     public int dataLength;
-    private int SYN;
-    private int FIN;
-    private int ACK;
-    private byte[] checksum;
+    public int SYN;
+    public int FIN;
+    public int ACK;
+    public byte[] checksum;
     public byte[] data;
     public byte[] fullHeader;
 
@@ -46,7 +46,7 @@ public class TCPheader {
     }
 
     // Use this for parsing a received TCP header
-    public void parseReceivedHeader(byte[] fullHeader) {
+    public boolean parseReceivedTCP(byte[] fullHeader) {
         // Set the data passed in
         this.fullHeader = fullHeader;
         
@@ -55,7 +55,7 @@ public class TCPheader {
         calculatedChecksum = calculateChecksum();
         if (calculatedChecksum[0] != 0 || calculatedChecksum[1] != 0) {
             System.out.println("Checksum mismatch");
-            return;
+            return false;
         }
         // Checksum is valid
         System.out.println("Checksum is valid");
@@ -83,6 +83,8 @@ public class TCPheader {
         System.out.println("FIN: " + this.FIN);
         System.out.println("ACK: " + this.ACK);
         System.out.println("Data: " + new String(this.data));
+
+        return true;
     }
 
     public byte[] returnFullHeader(){
