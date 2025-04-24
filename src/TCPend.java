@@ -83,7 +83,7 @@ public class TCPend {
                 }
                 // Create full TCP packet and include header 
                 TCPheader tcpHeader = new TCPheader(0, 0, System.nanoTime(), chunk.length, 1, 0, 0, chunk);
-                tcpHeader.parseReceivedHeader(tcpHeader.returnFullHeader());
+                tcpHeader.parseReceivedTCP(tcpHeader.returnFullHeader());
 
                 // Create a packet with the chunk data
                 DatagramPacket packet = tcpE.createPacket(tcpHeader.returnFullHeader(), 0, tcpHeader.returnFullHeader().length, tcpE.target_ipAddress, tcpE.target_port);
@@ -131,7 +131,7 @@ public class TCPend {
                 }
                 // Parse the TCP data
                 TCPheader tcpHeader = new TCPheader();
-                tcpHeader.parseReceivedHeader(packet.getData());
+                tcpHeader.parseReceivedTCP(packet.getData());
                 // Process the received packet
                 try {
                 fileChunkWriter.writeByteArrayToFile(tcpHeader.data, tcpHeader.dataLength, 0);
@@ -155,6 +155,16 @@ public class TCPend {
         System.out.println("Sockets closed successfully.");
         System.out.println("TCPend execution completed.");
     }
+
+    /********************************* Code to handle the TCP Initiation. **************************************************/
+
+    /** 
+     * This method is for initializing TCP as a sender
+     */
+
+    /**
+     * This method is for initializing TCP as a receiver
+     */
 
     /****************** This code will handle construction of the datagram into properly receivable data including the header. ********************************/
 
