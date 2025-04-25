@@ -36,10 +36,10 @@ public class TCPmessageStatus {
     public TCPmessageStatus(int byteSequenceNumber, int acknowledgmentNumber) {
         
         // Verify the parameters
-        if (byteSequenceNumber < 0) {
+        if (byteSequenceNumber =< 0) {
             throw new IllegalArgumentException("byteSequenceNumber must be greater than or equal to 0");
         }
-        if (acknowledgmentNumber < 0) {
+        if (acknowledgmentNumber =< 0) {
             throw new IllegalArgumentException("acknowledgmentNumber must be greater than or equal to 0");
         }
 
@@ -53,6 +53,39 @@ public class TCPmessageStatus {
         this.SYN = 0;
         this.FIN = 0;
         this.ACK = 0;
+    }
+
+    /**
+     * Process the message as a new instance
+     * @param byteMessage
+     */
+    public TCPmessageStatus(byte[] byteMessage) {
+        
+        // Verify the parameters
+        if (byteMessage == null) {
+            throw new IllegalArgumentException("byteMessage must not be null");
+        }
+
+        // Generate a TCP header with the data
+        TCPheader message = new TCPheader();
+        
+        // Parse the header
+        if (message.parseReceivedTCP(byteMessage) == false) {
+            throw new IllegalArgumentException("Message corrupted or invalid.");
+        }
+
+        // Set the parameters
+        this.byteSequenceNumber = message.byteSequenceNumber;
+        this.acknowledgmentNumber = message.acknowledgmentNumber;
+        this.SYN = message.SYN;
+        this.FIN = message.FIN;
+        this.ACK = message.ACK;
+        this.timestamp = message.timestamp;
+        this.dataLength = message.dataLength;
+        this.received = true;
+        this.containsData = (message.dataLength > 0);
+        this.sent = false;
+        this.acknowledged = false;
     }
 
     /**
