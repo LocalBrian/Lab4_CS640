@@ -12,7 +12,7 @@ import java.nio.file.*;
  * Create a class that will be the file opened for reading.
  * This class will be used to read the file in chunks, and then return those chunks when requested
  */
-public class TCPfilehandling {
+public class TCPfileHandling {
 
     private File file;
     private String filePath;
@@ -20,14 +20,14 @@ public class TCPfilehandling {
     private int currentPosition;
     public int currentChunkSize; // Size of the current chunk read
 
-    public TCPfilehandling(String filePath, int chunkSize) {
+    public TCPfileHandling(String filePath, int chunkSize) {
         this.filePath = filePath;
         this.file = new File(filePath);
         this.chunkSize = chunkSize;
         this.currentPosition = 0;
     }
 
-    public TCPfilehandling(String filePath) {
+    public TCPfileHandling(String filePath) {
         this.filePath = filePath;
         this.file = new File(filePath);
         this.currentPosition = 0;
@@ -177,7 +177,7 @@ public class TCPfilehandling {
     public void testReadWriteFile(String filename) throws IOException {
         
         // Create a new object
-        TCPfilehandling sourcefileHandler = new TCPfilehandling(filename, 1024);
+        TCPfileHandling sourcefileHandler = new TCPfileHandling(filename, 1024);
         
         // Create a byte array to hold the data
         byte[] data = new byte[1024]; // 1 KB buffer
@@ -188,7 +188,7 @@ public class TCPfilehandling {
         // update the file name with a 1 prior to the extension
         String newFileName = filename.substring(0, filename.lastIndexOf('.')) + "_1" + filename.substring(filename.lastIndexOf('.'));
         // Loop over file chunk reader until null pulling data
-        TCPfilehandling targetfileWriter = new TCPfilehandling(newFileName, 1024);
+        TCPfileHandling targetfileWriter = new TCPfileHandling(newFileName, 1024);
         // Create the new file if it doesn't exist
         targetfileWriter.createFile(newFileName);
         

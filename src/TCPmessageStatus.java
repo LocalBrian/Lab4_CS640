@@ -24,6 +24,7 @@ public class TCPmessageStatus {
     public int acknowledgmentNumber;
     public int dataLength;
     public long timestamp;
+    public TCPheader message;
 
     // Possibly unneeded
     // private int overallType; // 0: N/A, 1: Sent, 2: Received
@@ -36,10 +37,10 @@ public class TCPmessageStatus {
     public TCPmessageStatus(int byteSequenceNumber, int acknowledgmentNumber) {
         
         // Verify the parameters
-        if (byteSequenceNumber =< 0) {
+        if (byteSequenceNumber < 0) {
             throw new IllegalArgumentException("byteSequenceNumber must be greater than or equal to 0");
         }
-        if (acknowledgmentNumber =< 0) {
+        if (acknowledgmentNumber < 0) {
             throw new IllegalArgumentException("acknowledgmentNumber must be greater than or equal to 0");
         }
 
@@ -93,7 +94,7 @@ public class TCPmessageStatus {
      * SYN, FIN, ACK should be 0 or 1
      * @return byte array with the sender startup message
      */
-    public byte[] getDatalessMessage(int SYN, int FIN, int ACK) {
+    public void setDatalessMessage(int SYN, int FIN, int ACK) {
         
         // Verify the parameters
         if (SYN < 0 || SYN > 1) {
@@ -119,9 +120,9 @@ public class TCPmessageStatus {
 
         // Generate a TCP message with the data
         TCPheader message = new TCPheader(byteSequenceNumber,acknowledgmentNumber,timestamp,0,SYN,FIN,ACK,blankData);
-
-        // Return the byte array
-        return message.returnFullHeader();
+        this.message = message;
+        this.dataLength = 0;
+        this.containsData = false;
     }
 
     /**
@@ -130,35 +131,34 @@ public class TCPmessageStatus {
      * @param data byte array with the data
      * @return byte array with the sender startup message
      */
-    public byte[] getDataMessage(int SYN, int FIN, int ACK, byte[] data) {
-        
-        // Verify the parameters
-        if (SYN < 0 || SYN > 1) {
-            throw new IllegalArgumentException("SYN must be 0 or 1");
-        }
-        if (FIN < 0 || FIN > 1) {
-            throw new IllegalArgumentException("FIN must be 0 or 1");
-        }
-        if (ACK < 0 || ACK > 1) {
-            throw new IllegalArgumentException("ACK must be 0 or 1");
-        }
-        if (data == null) {
-            throw new IllegalArgumentException("data must not be null");
-        }
+    public void setDataMessage(byte[] data) {
 
         // Set parameters
-        this.SYN = SYN;
-        this.FIN = FIN;
-        this.ACK = ACK;
+        this.SYN = 0;
+        this.FIN = 0;
+        this.ACK = 1;
 
         // Get time stamp in nanoseconds
         long timeStamp = System.nanoTime();
 
         // Generate a TCP message with the data
-        TCPheader message = new TCPheader(byteSequenceNumber,acknowledgmentNumber,timestamp,0,SYN,FIN,ACK,data);
+        TCPheader message = new TCPheader(byteSequenceNumber,acknowledgmentNumber,timestamp,0,this.SYN,this.FIN,this.ACK,data);
+        this.message = message;
+    }
+
+    /**
+     * Returns a byte array for a message with data
+     * @return byte array with the sender startup message
+     */
+    public byte[] getMessage() {
+        
+        // Verify the parameters
+        if (this.message == null) {
+            throw new IllegalArgumentException("message must not be null");
+        }
 
         // Return the byte array
-        return message.returnFullHeader();
+        return this.message.returnFullHeader();
     }
 
     /**
@@ -201,6 +201,42 @@ public class TCPmessageStatus {
 
         // Return the byte array
         return message.data;
+    }
+
+    /**
+     * Verify the TCP message is as expected
+     * @param expectedByteSequenceNumber
+     * @param expectedAcknowledgmentNumber
+     * @param SYN
+     * @param FIN
+     * @param ACK
+     */
+    public boolean verifyMessage(int expectedByteSequenceNumber, int expectedAcknowledgmentNumber, int eSYN, int eFIN, int eACK) {
+        
+        // Verify the parameters
+        if (expectedByteSequenceNumber != this.byteSequenceNumber) {
+            System.out.println("Expected byte sequence number: " + expectedByteSequenceNumber + " but got: " + this.byteSequenceNumber);
+            return false;
+        }
+        if (expectedAcknowledgmentNumber != this.acknowledgmentNumber) {
+            System.out.println("Expected acknowledgment number: " + expectedAcknowledgmentNumber + " but got: " + this.acknowledgmentNumber);
+            return false;
+        }
+        if (eSYN != this.SYN) {
+            System.out.println("Expected SYN: " + eSYN + " but got: " + this.SYN);
+            return false;
+        }
+        if (eFIN != this.FIN) {
+            System.out.println("Expected FIN: " + eFIN + " but got: " + this.FIN);
+            return false;
+        }
+        if (eACK != this.ACK) {
+            System.out.println("Expected ACK: " + eACK + " but got: " + this.ACK);
+            return false;
+        }
+
+        // If all checks pass, return true
+        return true;
     }
 
     /**

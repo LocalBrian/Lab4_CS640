@@ -3,36 +3,30 @@
 
 public class TCPtimeout {
 
-    public boolean isActive;
-    public boolean isConnected;
-    public boolean isClosed;
-    private int TCPmode; // 1 for client, 2 for server
-    private long timeOutTimer;
+    private long startTime; 
+    public long timeOutTimer;    
 
+    public void TCPtimeout() {
+        // Set default values
+        System.out.println("Timeout of 5 seconds.");
+        // 5 seconds in nanoseconds
+        this.timeOutTimer = 5 * 1000000000L; // 5 seconds in nanoseconds
+        this.startTime = System.nanoTime();
+        
+    }
 
-    // public TCPtimeout(int TCPmode) {
-    //     this.TCPmode = TCPmode;
-    //     this.isActive = false;
-    //     this.isConnected = false;
-    //     this.isClosed = false;
-    //     this.filePath = filePath;
-    //     this.file = new File(filePath);
-    //     this.chunkSize = chunkSize;
-    //     this.currentPosition = 0;
-    // }
+    public void setTimeOut(long timeOut) {
+        // Set timeout value
+        this.timeOutTimer = timeOut;
+    }
 
-    // public TCPtimeout(String filePath) {
-    //     this.filePath = filePath;
-    //     this.file = new File(filePath);
-    //     this.currentPosition = 0;
-    // }
-    
+    public long getTimeOut() {
+        // Get timeout value
+        return this.timeOutTimer;
+    }
 
-    public int TCPtimeout() {
-        // Start the TCP connection
-        // This is a placeholder for the actual implementation
-        // In a real scenario, you would establish a TCP connection here
-        System.out.println("Starting TCP connection...");
-        return 0; // Return 0 to indicate success
+    public long getStartTime() {
+        // Get start time
+        return this.startTime;
     }
 }
