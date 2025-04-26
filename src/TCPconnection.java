@@ -8,11 +8,15 @@ import java.net.UnknownHostException;
 
 public class TCPconnection {
 
+    // Flags for which end of TCP this is
+    private byte TCP_sender = 1;
+    private byte TCP_receiver = 2;
+    private byte TCPmode; // 1 for client, 2 for server
+
     // Basic status variables
     public boolean isOpen;
     public boolean isConnected;
     public boolean isClosed;
-    private int TCPmode; // 1 for client, 2 for server
 
     // TCP connection variables
     private TCPtimeout timeout;
@@ -96,6 +100,21 @@ public class TCPconnection {
         this.isClosed = false;
 
         // Establish the TCP connection
+        if (this.TCPmode == TCP_sender) {
+            // Client mode
+            System.out.println("Establishing TCP connection to " + this.targetIPAddress + ":" + this.targetPort + "...");
+            if (!clientEstablishTCPconnection()) {
+                System.out.println("Failed to establish TCP connection in client mode.");
+                return false;
+            }
+        } else if (this.TCPmode == TCP_receiver) {
+            // Server mode
+            System.out.println("Waiting for incoming TCP connection on port " + this.communicationPort + "...");
+            if (!serverOpenListeningState()) {
+                System.out.println("Failed to establish TCP connection in server mode.");
+                return false;
+            }
+        }
 
 
         // Share data with over the TCP connection
@@ -160,6 +179,12 @@ public class TCPconnection {
         // Parse the TCP data
         TCPmessageStatus tcpMessageRCVinit = new TCPmessageStatus(workingPacket.getData());
 
+        // Check if the packet is null
+        if (tcpMessageRCVinit == null) {
+            System.out.println("Error parsing TCP message, closing the port and exiting.");
+            return false;
+        }
+
         // Verify the packet is a new SYN packet
         if (tcpMessageRCVinit.verifyMessage(0, 0, 1, 0, 0) == false) {
             System.out.println("Received packet is not a SYN packet. Closing connection.");
@@ -179,7 +204,7 @@ public class TCPconnection {
         this.messageListOut.add(outTCP);
 
         // Keep attempting to send the SYN-ACK packet until it is acknowledged
-        TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(outTCP); // 30 seconds timeout
+        TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(outTCP); 
 
         // Check if the packet is null
         if (tcpMessageRCVack == null) {
@@ -201,6 +226,63 @@ public class TCPconnection {
 
 
     /********************************************************* Client communication methods  ***************************************************/
+
+    /**
+     * This method is for when the server is attempting to establish a connection with the client.
+     */
+    public boolean clientEstablishTCPconnection() {
+        // Create a new DatagramPacket to receive the data
+        byte[] buffer = new byte[this.maxBytes];
+        int attempts = 0;
+
+        //  Create a new TCP message that is a SYN packet
+        TCPmessageStatus outTCP = new TCPmessageStatus(0, 0);
+        outTCP.setDatalessMessage(1, 0, 0); // SYN = 1, ACK = 0, FIN = 0
+        this.messageListOut.add(outTCP);
+
+        // Send the SYN packet to the server and listen for a response
+        TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(outTCP); 
+
+        // Check if the packet is null
+        if (tcpMessageRCVack == null) {
+            System.out.println("No packet received within the timeout period for SYN-ACK, closing the port and exiting.");
+            return false;
+        }
+
+        // Verify the packet is a SYN-ACK packet
+        if (tcpMessageRCVack.verifyMessage(0, 1, 1, 0, 1) == false) {
+            System.out.println("Received packet is not a SYN-ACK packet. Closing connection.");
+            return false;
+        }
+
+        // Store the received packet in the message list
+        this.messageListIn.add(tcpMessageRCVack);
+
+        // Create a new TCP message that is a SYN-ACK packet
+        TCPmessageStatus outTCP2 = new TCPmessageStatus(1, tcpMessageRCVack.byteSequenceNumber + 1);
+        outTCP2.setDatalessMessage(0, 0, 1); // SYN = 0, FIN = 0, ACK = 1
+        this.messageListOut.add(outTCP2);
+
+        // Keep attempting to send the SYN-ACK packet until it is acknowledged
+        TCPmessageStatus tcpMessageRCVack2 = sendAndWaitForResponse(outTCP2); 
+
+        // Check if the packet is null
+        if (tcpMessageRCVack2 == null) {
+            System.out.println("No packet received within the timeout period for acknowledgement, closing the port and exiting.");
+            return false;
+        }
+
+        // Verify the packet is an ACK packet
+        if (tcpMessageRCVack2.verifyMessage(1, 1, 0, 1, 0) == false) {
+            System.out.println("Received packet is not an ACK packet. Closing connection.");
+            return false;
+        }
+
+        // Add the received packet to the message list
+        this.messageListIn.add(tcpMessageRCVack2);
+
+        return true; // Return true to indicate success
+    }
 
 
 

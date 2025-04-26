@@ -12,6 +12,7 @@ public class TCPheader {
     public byte[] checksum;
     public byte[] data;
     public byte[] fullHeader;
+    public boolean checksumValid;
 
     public TCPheader() {
         this.byteSequenceNumber = 0;
@@ -23,6 +24,7 @@ public class TCPheader {
         this.FIN = 0;
         this.checksum = new byte[2];
         this.data = new byte[0];
+        this.checksumValid = true;
     }
 
     public TCPheader(int byteSequenceNumber, int acknowledgmentNumber, long timestamp, int dataLength, int SYN, int FIN, int ACK, byte[] data) {
@@ -40,8 +42,11 @@ public class TCPheader {
         // Store the header fields in a byte array
         buildHeaderStart();
 
-        // Calculate the checksum
-        calculateChecksum();
+        // Validate the checksum
+        if (!validateChecksum()) {
+            System.out.println("Checksum is invalid");
+            this.printData();
+        } 
 
     }
 
@@ -51,17 +56,10 @@ public class TCPheader {
         this.fullHeader = fullHeader;
         
         // Validate the checksum
-        byte[] calculatedChecksum = new byte[2];
-        calculatedChecksum = calculateChecksum();
-        if (calculatedChecksum[0] != 0 || calculatedChecksum[1] != 0) {
+        if (this.validateChecksum() == false) {
             System.out.println("Checksum mismatch");
             return false;
-        }
-        // Checksum is valid
-        System.out.println("Checksum is valid");
-        // Print the checksum array bits
-        System.out.println("Checksum array: ");
-        printByteBits(calculatedChecksum);
+        };
         
         // Parse the received TCP header
         this.byteSequenceNumber = convertByteToInt(fullHeader, 0);
@@ -74,15 +72,9 @@ public class TCPheader {
         
         this.data = new byte[this.dataLength];
         System.arraycopy(fullHeader, 24, this.data, 0, this.dataLength);
+        
         // Print the parsed header fields
-        System.out.println("Byte Sequence Number: " + this.byteSequenceNumber);
-        System.out.println("Acknowledgment Number: " + this.acknowledgmentNumber);
-        System.out.println("Timestamp: " + this.timestamp);
-        System.out.println("Data Length: " + this.dataLength);
-        System.out.println("SYN: " + this.SYN);
-        System.out.println("FIN: " + this.FIN);
-        System.out.println("ACK: " + this.ACK);
-        System.out.println("Data: " + new String(this.data));
+        this.printData();
 
         return true;
     }
@@ -124,11 +116,6 @@ public class TCPheader {
         System.out.println("Checksum array before calculation: ");
         printByteBits(checksumArray);
 
-        // For testing purposes do the checksum again, should now be 0
-        byte[] checksumArray2 = calculateChecksum();
-        // Print the checksum array bits
-        System.out.println("Checksum array after calculation: ");
-        printByteBits(checksumArray2);
     }
 
     public void setLengthAndStatus() {
@@ -226,6 +213,22 @@ public class TCPheader {
 
     }
 
+    /**
+     * Validate the checksum
+     */
+    public boolean validateChecksum() {
+        // Calculate the checksum
+        byte[] calculatedChecksum = calculateChecksum();
+        // Check if the checksum is valid
+        if (calculatedChecksum[0] == 0 && calculatedChecksum[1] == 0) {
+            this.checksumValid = true;
+            return true;
+        } else {
+            this.checksumValid = false;
+            return false;
+        }
+    }
+
     public int convertByteToInt(byte[] byteArray, int startIndex) {
         // Convert a byte array to an integer
         int value = 0;
@@ -289,6 +292,22 @@ public class TCPheader {
             String bits = String.format("%8s", Integer.toBinaryString(bytes[i] & 0xFF)).replace(' ', '0');
             System.out.println("byte[" + i + "]: " + bits);
         }
+    }
+
+    /**
+     * Print data
+     * @param bytes
+     */
+    public void printData() {
+        // Print the parsed header fields
+        System.out.println("Byte Sequence Number: " + this.byteSequenceNumber);
+        System.out.println("Acknowledgment Number: " + this.acknowledgmentNumber);
+        System.out.println("Timestamp: " + this.timestamp);
+        System.out.println("Data Length: " + this.dataLength);
+        System.out.println("SYN: " + this.SYN);
+        System.out.println("FIN: " + this.FIN);
+        System.out.println("ACK: " + this.ACK);
+        System.out.println("Data: " + new String(this.data));
     }
 
 }

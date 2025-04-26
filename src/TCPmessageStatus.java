@@ -87,6 +87,7 @@ public class TCPmessageStatus {
         this.containsData = (message.dataLength > 0);
         this.sent = false;
         this.acknowledged = false;
+        this.message = message;
     }
 
     /**
@@ -94,7 +95,7 @@ public class TCPmessageStatus {
      * SYN, FIN, ACK should be 0 or 1
      * @return byte array with the sender startup message
      */
-    public void setDatalessMessage(int SYN, int FIN, int ACK) {
+    public void setDatalessMessage(int eSYN, int eFIN, int eACK) {
         
         // Verify the parameters
         if (SYN < 0 || SYN > 1) {
@@ -108,9 +109,9 @@ public class TCPmessageStatus {
         }
 
         // Set parameters
-        this.SYN = SYN;
-        this.FIN = FIN;
-        this.ACK = ACK;
+        this.SYN = eSYN;
+        this.FIN = eFIN;
+        this.ACK = eACK;
 
         // Get time stamp in nanoseconds
         long timeStamp = System.nanoTime();
@@ -174,33 +175,34 @@ public class TCPmessageStatus {
         }
 
         // Generate a TCP header with the data
-        TCPheader message = new TCPheader();
+        TCPheader message1 = new TCPheader();
         
         // Parse the header
-        if (message.parseReceivedTCP(data) == false) {
+        if (message1.parseReceivedTCP(data) == false) {
             throw new IllegalArgumentException("Message corrupted or invalid.");
         }
 
         // Set the parameters
-        this.byteSequenceNumber = message.byteSequenceNumber;
-        this.acknowledgmentNumber = message.acknowledgmentNumber;
-        this.SYN = message.SYN;
-        this.FIN = message.FIN;
-        this.ACK = message.ACK;
-        this.timestamp = message.timestamp;
+        this.byteSequenceNumber = message1.byteSequenceNumber;
+        this.acknowledgmentNumber = message1.acknowledgmentNumber;
+        this.SYN = message1.SYN;
+        this.FIN = message1.FIN;
+        this.ACK = message1.ACK;
+        this.timestamp = message1.timestamp;
         this.received = true;
+        this.message = message1;
 
         // Determine if there is data
-        if (message.dataLength > 0) {
+        if (message1.dataLength > 0) {
             this.containsData = true;
-            this.dataLength = message.dataLength;
+            this.dataLength = message1.dataLength;
         } else {
             this.containsData = false;
             return null;
         }
 
         // Return the byte array
-        return message.data;
+        return message1.data;
     }
 
     /**
@@ -213,6 +215,12 @@ public class TCPmessageStatus {
      */
     public boolean verifyMessage(int expectedByteSequenceNumber, int expectedAcknowledgmentNumber, int eSYN, int eFIN, int eACK) {
         
+        // Confirm the checksum is correct
+        if (this.message.validateChecksum() == false) {
+            System.out.println("Checksum error.");
+            return false;
+        }
+
         // Verify the parameters
         if (expectedByteSequenceNumber != this.byteSequenceNumber) {
             System.out.println("Expected byte sequence number: " + expectedByteSequenceNumber + " but got: " + this.byteSequenceNumber);
