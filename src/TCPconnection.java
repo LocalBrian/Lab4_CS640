@@ -45,7 +45,7 @@ public class TCPconnection {
      * @param maxUnitSize The maximum unit size
      * @param maxUnits The maximum number of units
      */
-    public boolean TCPconnection(TCPfileHandling fileHandler, String target_ipAddress, int communicationPort, int targetPort, int maxUnitSize, int maxUnits) {
+    public TCPconnection(TCPfileHandling fileHandler, String target_ipAddress, int communicationPort, int targetPort, int maxUnitSize, int maxUnits) {
         this.TCPmode = 1;
         this.isOpen = false;
         this.isConnected = false;
@@ -56,7 +56,6 @@ public class TCPconnection {
         this.messageListIn = new ArrayList <TCPmessageStatus>();
         this.messageListOut = new ArrayList <TCPmessageStatus>();
         this.timeout = new TCPtimeout();
-        return true;
     }
 
     /**
@@ -67,7 +66,7 @@ public class TCPconnection {
      * @param maxUnits The maximum number of units
      * 
      */
-    public boolean TCPconnection(TCPfileHandling fileHandler, int communicationPort, int maxUnitSize, int maxUnits) {
+    public TCPconnection(TCPfileHandling fileHandler, int communicationPort, int maxUnitSize, int maxUnits) {
         this.TCPmode = 2;
         this.isOpen = false;
         this.isConnected = false;
@@ -79,7 +78,6 @@ public class TCPconnection {
         this.messageListIn = new ArrayList <TCPmessageStatus>();
         this.messageListOut = new ArrayList <TCPmessageStatus>();
         this.timeout = new TCPtimeout();
-        return true;
     }
 
 
@@ -87,7 +85,7 @@ public class TCPconnection {
      * This is for after all initial validation is completed and the communication can be started.
      * @return True if successful, false if not
      */
-    public boolean startTCPcommunication() {
+    public boolean performTCPcommunication() {
         
         // Open the ports for communication and for listening
         this.socket_in = createSocket(communicationPort);
