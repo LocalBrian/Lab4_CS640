@@ -124,6 +124,8 @@ public class TCPconnection {
 
         // Share data with over the TCP connection
 
+        // Communicate TCP connection end
+
         // Terminate the TCP connection        
         this.endTCPcommunication();
         
@@ -231,6 +233,75 @@ public class TCPconnection {
 
         // Add the received packet to the message list
         this.messageListIn.add(tcpMessageRCVack);
+
+        return true; // Return true to indicate success
+    }
+
+    /**
+     * This method is for when the server is receiving data from the client.
+     */
+    public boolean serverReceiveData() {
+
+        // Initialize the variables for controlling the while loop
+        boolean finAttempt = false;
+
+        // Loop until either a null or a FIN packet is received
+        while (finAttempt == false) {
+            
+            TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(null, true);
+
+            // Check if the packet is null
+            if (tcpMessageRCVack == null) {
+                System.out.println("No packet received within the timeout period, closing the port and exiting.");
+                return false;
+            }
+
+            // Check if the packet is a FIN packet
+            if (tcpMessageRCVack.verifyMessage(0, 0, 0, 1, 0) == true) {
+                System.out.println("Received FIN packet. Initiating close.");
+                finAttempt = true;
+                break; // Exit the loop if a FIN packet is received
+            }
+
+            // Ensure the packet is a data packet
+            if (tcpMessageRCVack.verifyMessage(0, 0, 0, 1, 0) == false) {
+                System.out.println("Received packet is not a data packet. Closing connection.");
+                return false;
+            }
+
+            // Determine if data was already received
+
+            // Store the received packet in the message list
+            this.messageListIn.add(tcpMessageRCVdata);
+
+        }
+
+        // Listen for incoming packets
+        TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(null, true);
+
+        // Check if the packet is null
+        if (responsePacket == null) {
+            System.out.println("No packet received within the timeout period of 60 seconds, closing the port and exiting.");
+            return false;
+        }
+
+        // Parse the TCP data
+        TCPmessageStatus tcpMessageRCVdata = new TCPmessageStatus(responsePacket.getData());
+
+        // Check if the packet is null
+        if (tcpMessageRCVdata == null) {
+            System.out.println("Error parsing TCP message, closing the port and exiting.");
+            return false;
+        }
+
+        // Verify the packet is a data packet
+        if (tcpMessageRCVdata.verifyMessage(0, 0, 0, 1, 0) == false) {
+            System.out.println("Received packet is not a data packet. Closing connection.");
+            return false;
+        }
+
+        // Store the received packet in the message list
+        this.messageListIn.add(tcpMessageRCVdata);
 
         return true; // Return true to indicate success
     }
