@@ -35,6 +35,9 @@ public class TCPheader {
         this.timestamp = timestamp;
         this.dataLength = dataLength;
         this.SYN = SYN;
+        System.out.println("1SYN: " + SYN);
+        System.out.println("1FIN: " + FIN);
+        System.out.println("1ACK: " + ACK);
         this.FIN = FIN;
         this.ACK = ACK;
         this.data = data;
@@ -66,12 +69,16 @@ public class TCPheader {
         this.acknowledgmentNumber = convertByteToInt(fullHeader, 4);
         this.timestamp = convertByteToLong(fullHeader, 8);
         this.dataLength = (convertByteToInt(fullHeader, 16) >> 3) & 0xFFFF;
-        this.SYN = (fullHeader[16] >> 2) & 0x1;
-        this.FIN = (fullHeader[16] >> 1) & 0x1;
-        this.ACK = fullHeader[16] & 0x1;
+        this.SYN = (convertByteToInt(fullHeader, 16) >> 2) & 0x1;
+        this.FIN = (convertByteToInt(fullHeader, 16) >> 1) & 0x1;
+        this.ACK = convertByteToInt(fullHeader, 16) & 0x1;
         
-        this.data = new byte[this.dataLength];
-        System.arraycopy(fullHeader, 24, this.data, 0, this.dataLength);
+        if (this.dataLength > 0) {
+            this.data = new byte[this.dataLength];
+            System.arraycopy(fullHeader, 24, this.data, 0, this.dataLength);
+        } else {
+            this.data = new byte[0];
+        }
         
         // Print the parsed header fields
         this.printData();
@@ -122,12 +129,8 @@ public class TCPheader {
         
         // Bit shift left 3 places to make space for the flags
         int shiftedLength = this.dataLength << 3;
-        // Set the SYN, FIN, and ACK flags
-        this.SYN = (this.SYN & 0x1) << 2;
-        this.FIN = (this.FIN & 0x1) << 1;
-        this.ACK = (this.ACK & 0x1);
         // Combine the length and flags into a single integer
-        int lengthStatus = shiftedLength | this.SYN | this.FIN | this.ACK;
+        int lengthStatus = shiftedLength | (this.SYN & 0x1) << 2 | (this.FIN & 0x1) << 1 | (this.ACK & 0x1);
         // Convert the length and status to a byte array
         byte[] lengthStatusArray = convertIntToByte(lengthStatus);
         // Set the length and status in the full header

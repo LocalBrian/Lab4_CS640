@@ -69,11 +69,15 @@ public class TCPmessageStatus {
 
         // Generate a TCP header with the data
         TCPheader message = new TCPheader();
+
+        System.out.println("Parsing message: " + byteMessage.length);
         
         // Parse the header
         if (message.parseReceivedTCP(byteMessage) == false) {
             throw new IllegalArgumentException("Message corrupted or invalid.");
         }
+
+        System.out.println("Parsed message: " + message.dataLength);
 
         // Set the parameters
         this.byteSequenceNumber = message.byteSequenceNumber;
@@ -98,13 +102,13 @@ public class TCPmessageStatus {
     public void setDatalessMessage(int eSYN, int eFIN, int eACK) {
         
         // Verify the parameters
-        if (SYN < 0 || SYN > 1) {
+        if (eSYN < 0 || eSYN > 1) {
             throw new IllegalArgumentException("SYN must be 0 or 1");
         }
-        if (FIN < 0 || FIN > 1) {
+        if (eFIN < 0 || eFIN > 1) {
             throw new IllegalArgumentException("FIN must be 0 or 1");
         }
-        if (ACK < 0 || ACK > 1) {
+        if (eACK < 0 || eACK > 1) {
             throw new IllegalArgumentException("ACK must be 0 or 1");
         }
 
@@ -120,7 +124,7 @@ public class TCPmessageStatus {
         byte[] blankData = new byte[0];
 
         // Generate a TCP message with the data
-        TCPheader message = new TCPheader(byteSequenceNumber,acknowledgmentNumber,timestamp,0,SYN,FIN,ACK,blankData);
+        TCPheader message = new TCPheader(byteSequenceNumber,acknowledgmentNumber,timestamp,0,eSYN,eFIN,eACK,blankData);
         this.message = message;
         this.dataLength = 0;
         this.containsData = false;
