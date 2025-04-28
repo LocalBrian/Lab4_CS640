@@ -21,6 +21,7 @@ public class TCPconnection {
     // TCP connection variables
     private TCPtimeout timeout;
     private TCPfileHandling fileHandler;
+    private TCPdataTracker dataTracker;
     private int communicationPort; // Port that will be used for communication on this host
     private int targetPort; // Port at remote host that will be targetted
     private InetAddress targetIPAddress; // IP address to communicate to
@@ -111,6 +112,10 @@ public class TCPconnection {
                 this.endTCPcommunication();
                 return false;
             }
+
+            // Create the data tracker
+            this.dataTracker = new TCPdataTracker(true, this.maxUnitSize, this.fileHandler);
+
         } else if (this.TCPmode == TCP_receiver) {
             // Server mode
             System.out.println("Waiting for incoming TCP connection on port " + this.communicationPort + "...");
@@ -119,10 +124,12 @@ public class TCPconnection {
                 this.endTCPcommunication();
                 return false;
             }
+
+            // Create the data tracker
+            this.dataTracker = new TCPdataTracker(false, this.maxUnitSize, this.fileHandler);
         }
 
-
-        // Share data with over the TCP connection
+        // Share data over the TCP connection
 
         // Communicate TCP connection end
 
@@ -217,24 +224,33 @@ public class TCPconnection {
         this.messageListOut.add(outTCP);
 
         // Keep attempting to send the SYN-ACK packet until it is acknowledged
+        attempts = 0;
+        while (attempts < this.maxRetries) {
+
         TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(outTCP, true); 
 
         // Check if the packet is null
         if (tcpMessageRCVack == null) {
-            System.out.println("No packet received within the timeout period of 30 seconds for acknowledgement, closing the port and exiting.");
-            return false;
+            // Do nothing, just retry
+            attempts++;
+            } // Verify the packet is an ACK packet
+            else if (tcpMessageRCVack.verifyMessage(1, 1, 0, 0, 1) == false) {
+                // Do nothing, just retry
+                attempts++;
+            } else {
+                break; // Exit the loop if the ACK packet is received successfully
+            }        
+        
         }
-
-        // Verify the packet is an ACK packet
-        if (tcpMessageRCVack.verifyMessage(1, 1, 0, 0, 1) == false) {
-            System.out.println("Received packet is not an ACK packet. Closing connection.");
+        
+        // Check if the packet is null
+        if (tcpMessageRCVack == null) {
+            System.out.println("No packet received within the timeout period for SYN-ACK, closing the port and exiting.");
             return false;
         }
 
         // Add the received packet to the message list
         this.messageListIn.add(tcpMessageRCVack);
-
-        return true; // Return true to indicate success
     }
 
     /**
@@ -243,67 +259,49 @@ public class TCPconnection {
     public boolean serverReceiveData() {
 
         // Initialize the variables for controlling the while loop
-        boolean finAttempt = false;
+        boolean connectionLost = false;
+        int attempts;
 
         // Loop until either a null or a FIN packet is received
-        while (finAttempt == false) {
+        while (connectionLost == false) {
+
+            attempts = 0;
+
+            while (attempts < this.maxRetries) {
             
-            TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(null, true);
+                TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(null, true);
 
-            // Check if the packet is null
-            if (tcpMessageRCVack == null) {
-                System.out.println("No packet received within the timeout period, closing the port and exiting.");
-                return false;
+                // Check if the packet is null
+                if (tcpMessageRCVack == null) {
+                    attempts++;
+                } // Check if the packet is a FIN packet, if so move to close
+                else if (tcpMessageRCVack.verifyMessage(0, 0, 0, 1, 0) == true) {
+                    System.out.println("Received FIN packet. Initiating close.");
+                    return true;
+                } // Check if the packet is a data packet -- this needs configured for what to look for
+                else if (tcpMessageRCVack.verifyMessage(0, 0, 0, 1, 0) == true) {
+                    // Process the received data bytes
+                    this.dataTracker.receiverAddData(tcpMessageRCVack.byteSequenceNumber, tcpMessageRCVack.dataLength, tcpMessageRCVack.data);
+                    break; // Exit the loop if the ACK data packet is received successfully
+                } else {
+                    attempts++;
+                }
+
             }
-
-            // Check if the packet is a FIN packet
-            if (tcpMessageRCVack.verifyMessage(0, 0, 0, 1, 0) == true) {
-                System.out.println("Received FIN packet. Initiating close.");
-                finAttempt = true;
-                break; // Exit the loop if a FIN packet is received
-            }
-
-            // Ensure the packet is a data packet
-            if (tcpMessageRCVack.verifyMessage(0, 0, 0, 1, 0) == false) {
-                System.out.println("Received packet is not a data packet. Closing connection.");
-                return false;
-            }
-
-            // Determine if data was already received
 
             // Store the received packet in the message list
             this.messageListIn.add(tcpMessageRCVdata);
 
+            if (attempts == this.maxRetries) {
+                System.out.println("No packet received within the timeout period for data, closing the port and exiting.");
+                connectionLost = true;
+            }
+
+            
         }
 
-        // Listen for incoming packets
-        TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(null, true);
-
-        // Check if the packet is null
-        if (responsePacket == null) {
-            System.out.println("No packet received within the timeout period of 60 seconds, closing the port and exiting.");
-            return false;
-        }
-
-        // Parse the TCP data
-        TCPmessageStatus tcpMessageRCVdata = new TCPmessageStatus(responsePacket.getData());
-
-        // Check if the packet is null
-        if (tcpMessageRCVdata == null) {
-            System.out.println("Error parsing TCP message, closing the port and exiting.");
-            return false;
-        }
-
-        // Verify the packet is a data packet
-        if (tcpMessageRCVdata.verifyMessage(0, 0, 0, 1, 0) == false) {
-            System.out.println("Received packet is not a data packet. Closing connection.");
-            return false;
-        }
-
-        // Store the received packet in the message list
-        this.messageListIn.add(tcpMessageRCVdata);
-
-        return true; // Return true to indicate success
+        
+        return false; // Return false to indicate connection was lost
     }
 
 
@@ -351,6 +349,110 @@ public class TCPconnection {
         return true; // Return true to indicate success
     }
 
+    /**
+     * This method is for when the client is sending data to the server.
+     */
+    public boolean clientSendData() {
+        // Initialize the variables for controlling the while loop
+        boolean connectionLost = false;
+        int attempts;
+        TCPmessageStatus tcpMessageData = new TCPmessageStatus(0, 0);
+        TCPmessageStatus tcpMessageRCVack = new TCPmessageStatus(0, 0);
+        TCPmessageStatus lastSuccMess = null;
+        byte[] data = null;
+
+        // Loop until either a null or a FIN packet is received
+        while (connectionLost == false) {
+
+            attempts = 0;
+
+            // Last successful message and data to be sent
+            lastSuccMess = this.messageListOut.get(this.messageListOut.size() - 1);
+            data = this.dataTracker.senderRetrieveData();
+
+            // Check if data is null, if so move to close connection
+            if (data == null) {
+                return true;
+            }
+
+            // Build message that will be sent
+            tcpMessageData.setDataMessage(lastSuccMess.dataLength + lastSuccMess.byteSequenceNumber, 1, data);
+
+            while (attempts < this.maxRetries) {
+            
+                TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(tcpMessageData, true);
+
+                // Check if the packet is null
+                if (tcpMessageRCVack == null) {
+                    attempts++;
+                } // Check if the packet is an ACK packet -- this needs configured for what to look for
+                else if (tcpMessageRCVack.verifyMessage(1, tcpMessageData.dataLength + tcpMessageData.byteSequenceNumber, 0, 1, 0) == true) {
+                    // Process the received data bytes
+                    this.dataTracker.senderAckData();
+                    break; // Exit the loop if the ACK data packet is received successfully
+                } else {
+                    attempts++;
+                }
+
+            }
+
+            // Store the received packet in the message list
+            this.messageListIn.add(tcpMessageRCVdata);
+
+            if (attempts == this.maxRetries) {
+                System.out.println("No packet received within the timeout period for data, closing the port and exiting.");
+                connectionLost = true;
+            }
+   
+        }
+        
+        return false; // Return false to indicate connection was lost
+    }
+
+    /**
+     * This method is for when the server is attempting to establish a connection with the client.
+     */
+    public boolean clientCloseTCPconnection() {
+        // Create a new DatagramPacket to receive the data
+        byte[] buffer = new byte[this.maxBytes];
+        int attempts = 0;
+
+        //  Create a new TCP message that is a SYN packet
+        TCPmessageStatus outTCP = new TCPmessageStatus(0, 0);
+        outTCP.setDatalessMessage(0, 0, 1); // SYN = 1, ACK = 0, FIN = 0
+        this.messageListOut.add(outTCP);
+
+        while (attempts < this.maxRetries) {
+
+            // Send the FIN packet to the server and listen for a response
+            TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(outTCP, true); 
+
+            // Check if the packet is null
+            if (tcpMessageRCVack == null) {
+                System.out.println("No packet received within the timeout period for SYN-ACK, closing the port and exiting.");
+                return false;
+            }
+
+            // Verify the packet is a SYN-ACK packet
+            if (tcpMessageRCVack.verifyMessage(0, 1, 0, 1, 1) == false) {
+                System.out.println("Received packet is not a FIN-ACK packet. Closing connection.");
+                return false;
+            }
+        }
+
+        // Store the received packet in the message list
+        this.messageListIn.add(tcpMessageRCVack);
+
+        // Create a new TCP message that is an ACK packet
+        TCPmessageStatus outTCP2 = new TCPmessageStatus(1, tcpMessageRCVack.byteSequenceNumber + 1);
+        outTCP2.setDatalessMessage(0, 0, 1); // SYN = 0, FIN = 0, ACK = 1
+        this.messageListOut.add(outTCP2);
+
+        // Send the ack packet and don't wait for a response
+        TCPmessageStatus tcpMessageRCVack2 = sendAndWaitForResponse(outTCP2, false); 
+
+        return true; // Return true to indicate success
+    }
 
 
     /****************** This code will handle construction of the datagram into properly receivable data including the header. ********************************/
@@ -438,7 +540,6 @@ public class TCPconnection {
     private TCPmessageStatus sendAndWaitForResponse(TCPmessageStatus tcpMessage, boolean waitForResponse) {
         
         // Initialize
-        int attempts = 0;
         DatagramPacket outPacket = null;
 
         // Create a new DatagramPacket to send the data if not void
@@ -457,37 +558,25 @@ public class TCPconnection {
         byte[] buffer = new byte[this.maxBytes];
         DatagramPacket responsePacket = null;
 
-        while (attempts < this.maxRetries) {
-
-            // Send a packet using the socket if there is one
-            if (outPacket != null) {
-                try {
-                sendPacket(outPacket, tcpMessage);
-                } catch (IOException e) {
-                    System.out.println("Error sending packet: " + e.getMessage());
-                }
-            }
-
-            // Check if there needs to be a response
-            if (waitForResponse == false) {
-                return null; // No need to wait for a response
-            }
-            
-            // Wait for the client to send a response packet
+        // Send a packet using the socket if there is one
+        if (outPacket != null) {
             try {
-                responsePacket = receivePacket(); 
+            sendPacket(outPacket, tcpMessage);
             } catch (IOException e) {
-                System.out.println("Error receiving packet: " + e.getMessage());
+                System.out.println("Error sending packet: " + e.getMessage());
             }
+        }
 
-            // Check if the packet is null
-            if (responsePacket == null) {
-                attempts++;
-                continue; // Retry sending the SYN-ACK packet
-            }
-            else {
-                break; // Exit the loop if the ACK packet is received successfully
-            }
+        // Check if there needs to be a response
+        if (waitForResponse == false) {
+            return null; // No need to wait for a response
+        }
+        
+        // Wait for the client to send a response packet
+        try {
+            responsePacket = receivePacket(); 
+        } catch (IOException e) {
+            System.out.println("Error receiving packet: " + e.getMessage());
         }
 
         // Check if the packet is null

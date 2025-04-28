@@ -136,18 +136,25 @@ public class TCPmessageStatus {
      * @param data byte array with the data
      * @return byte array with the sender startup message
      */
-    public void setDataMessage(byte[] data) {
+    public void setDataMessage(int byteSqnNum, int ackNum, byte[] data) {
 
         // Set parameters
         this.SYN = 0;
         this.FIN = 0;
         this.ACK = 1;
+        this.byteSequenceNumber = byteSqnNum;
+        this.acknowledgmentNumber = ackNum;
+        this.dataLength = data.length;
+        this.containsData = true;
+        this.sent = true;
+        this.received = false;
+        this.acknowledged = false;
 
         // Get time stamp in nanoseconds
         long timeStamp = System.nanoTime();
 
         // Generate a TCP message with the data
-        TCPheader message = new TCPheader(byteSequenceNumber,acknowledgmentNumber,timestamp,0,this.SYN,this.FIN,this.ACK,data);
+        TCPheader message = new TCPheader(byteSqnNum,ackNum,timestamp,0,this.SYN,this.FIN,this.ACK,data);
         this.message = message;
     }
 
