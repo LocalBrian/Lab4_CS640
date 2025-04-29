@@ -248,23 +248,18 @@ public class TCPmessageStatus {
 
         // Verify the parameters
         if (expectedByteSequenceNumber != this.byteSequenceNumber) {
-            System.out.println("Expected byte sequence number: " + expectedByteSequenceNumber + " but got: " + this.byteSequenceNumber);
             return false;
         }
         if (expectedAcknowledgmentNumber != this.acknowledgmentNumber) {
-            System.out.println("Expected acknowledgment number: " + expectedAcknowledgmentNumber + " but got: " + this.acknowledgmentNumber);
             return false;
         }
         if (eSYN != this.SYN) {
-            System.out.println("Expected SYN: " + eSYN + " but got: " + this.SYN);
             return false;
         }
         if (eFIN != this.FIN) {
-            System.out.println("Expected FIN: " + eFIN + " but got: " + this.FIN);
             return false;
         }
         if (eACK != this.ACK) {
-            System.out.println("Expected ACK: " + eACK + " but got: " + this.ACK);
             return false;
         }
 
