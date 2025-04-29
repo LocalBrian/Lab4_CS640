@@ -448,7 +448,7 @@ public class TCPconnection {
                 }
 
                 // While loop waiting for ACK
-                while (tcpMessageRCVack == null) {
+                if (tcpMessageRCVack != null) {
                     // Wait for a packet to come in
                     tcpMessageRCVack = sendAndWaitForResponse(null, true);
 
@@ -458,19 +458,23 @@ public class TCPconnection {
                     } 
                     // See if it matches one of the messages we sent
                     for (TCPmessageStatus message : this.messageListOut) {
-                        if (tcpMessageRCVack.verifyMessage(message.byteSequenceNumber, 1, 0, 0, 1) == true) {
+                        if (tcpMessageRCVack.verifyMessage( 1, message.byteSequenceNumber + message.dataLength, 0, 0, 1) == true) {
                             // Check if the message is already acknowledged
                             if (message.isAcknowledged() == true) {
                                 System.out.println("Message already acknowledged, skipping.");
                                 continue; // Skip to the next message
                             } // Increment the active messages acknowledged and mark the message as acknowledged
                             else {
+                                System.out.println("Message acknowledged: " + message.byteSequenceNumber);
                                 message.setAcknowledged();
                                 activeMessagesAcked++;
                             }
                             
                         }
+
                     }
+                    System.out.println("Exited message loop check");
+                    break;
                 }
 
                 // Check if active messages acknowledged is equal to the number of messages sent
@@ -608,7 +612,6 @@ public class TCPconnection {
         try {
             
             DatagramSocket socket = new DatagramSocket(port);
-            socket.setSoTimeout(1000); // Set a timeout for receiving packets
 
             // Create the socket with the specified port
             return socket;
@@ -669,6 +672,10 @@ public class TCPconnection {
             responsePacket = receivePacket(); 
         } catch (IOException e) {
             System.out.println("Error receiving packet: " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            System.out.println("Socket timed out: " + e.getMessage());
+            return null;
         }
 
         // Check if the packet is null
@@ -716,12 +723,9 @@ public class TCPconnection {
      * @throws IOException
      */
     private DatagramPacket receivePacket() throws IOException {
-        
-        // Convert nanoseconds to milliseconds
-        int waitTime = (int) (this.timeout.getTimeOut() / 1000000);
 
         // Set the timeOut for this listen
-        this.socket.setSoTimeout(waitTime);
+        this.socket.setSoTimeout(this.timeout.getTimeOut());
         
         // Create datagram packet to receive data
         byte[] buffer = new byte[this.maxBytes];
