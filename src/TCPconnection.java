@@ -281,6 +281,7 @@ public class TCPconnection {
         // Initialize the variables for controlling the while loop
         boolean connectionLost = false;
         TCPmessageStatus tcpMessageRCVack = null;
+        TCPmessageStatus outTCP = null;
         int attempts;
 
         // Loop until either a null or a FIN packet is received
@@ -304,7 +305,7 @@ public class TCPconnection {
                 // Check if the packet is previously received
                 else if (this.dataTracker.isDataReceived(tcpMessageRCVack.byteSequenceNumber + tcpMessageRCVack.dataLength) == true) {
                     // Send an ACK packet to the client
-                    TCPmessageStatus outTCP = new TCPmessageStatus(1, tcpMessageRCVack.byteSequenceNumber + tcpMessageRCVack.dataLength);
+                    outTCP = new TCPmessageStatus(1, tcpMessageRCVack.byteSequenceNumber + tcpMessageRCVack.dataLength);
                     outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
                     this.messageListOut.add(outTCP);
                     // Send the ACK packet to the client
@@ -312,7 +313,7 @@ public class TCPconnection {
                     attempts = 0; // Reset the attempts counter something was received
                 }
                 // Check if the packet is a data packet -- this needs configured for what to look for
-                else if (tcpMessageRCVack.verifyMessage(this.dataTracker.getNextExpectedByte(), 1, 0, 0, 1) == true) {
+                else if (tcpMessageRCVack.verifyMessage(this.dataTracker.getNextExpectedByte() + 1, 1, 0, 0, 1) == true) {
                     // Process the received data bytes
                     this.dataTracker.receiverAddData(tcpMessageRCVack.byteSequenceNumber, tcpMessageRCVack.dataLength, tcpMessageRCVack.getMessage());
                     break; // Exit the loop if the ACK data packet is received successfully
@@ -328,9 +329,12 @@ public class TCPconnection {
             this.messageListIn.add(tcpMessageRCVack);
 
             // Send an ACK packet to the client
-            TCPmessageStatus outTCP = new TCPmessageStatus(1, tcpMessageRCVack.byteSequenceNumber + tcpMessageRCVack.dataLength);
+            outTCP = new TCPmessageStatus(1, tcpMessageRCVack.byteSequenceNumber + tcpMessageRCVack.dataLength);
             outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
             this.messageListOut.add(outTCP);
+
+            // Send the ACK packet to the client
+            sendAndWaitForResponse(outTCP, false); // Don't wait for a response
 
             if (attempts == this.maxRetries) {
                 System.out.println("No packet received within the timeout period for data, closing the port and exiting.");
@@ -533,12 +537,12 @@ public class TCPconnection {
             DatagramPacket packet = new DatagramPacket(data, 0, data.length, this.targetIPAddress, this.targetPort);
             
             // Confirm the details of the sent packet
-            if (this.extra_logging) {
-                System.out.println("Sent packet details ---- create packet 2");
-                TCPmessageStatus tcpMessageSent = new TCPmessageStatus(packet.getData());
-                tcpMessageSent.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
-                System.out.println("Above is analystis of just sent packet.");
-            }
+            // if (this.extra_logging) {
+            //     System.out.println("Sent packet details ---- create packet 2");
+            //     TCPmessageStatus tcpMessageSent = new TCPmessageStatus(packet.getData());
+            //     tcpMessageSent.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
+            //     System.out.println("Above is analystis of just sent packet.");
+            // }
 
             return packet;
         } catch (Exception e) {
@@ -586,11 +590,11 @@ public class TCPconnection {
         // Create a new DatagramPacket to send the data if not void
         if (tcpMessage != null) {
             // Print details of the message
-            if (this.extra_logging) {
-                System.out.println("TCP data sendandwait ---- ");
-                tcpMessage.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
-                tcpMessage.message.printData();
-            }
+            // if (this.extra_logging) {
+            //     System.out.println("TCP data sendandwait ---- ");
+            //     tcpMessage.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
+            //     tcpMessage.message.printData();
+            // }
             byte[] data = tcpMessage.getMessage();
             outPacket = createPacket(data);
         } 
@@ -631,12 +635,13 @@ public class TCPconnection {
         // Parse the TCP data
         TCPmessageStatus tcpMessageRCV = new TCPmessageStatus(responsePacket.getData());
 
+
         // Print the received message details
         if (tcpMessageRCV == null) {
             System.out.println("Error parsing TCP message.");
             return null;
         }
-        tcpMessageRCV.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
+        // tcpMessageRCV.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
 
         // Return the received packet
         return tcpMessageRCV;
@@ -652,15 +657,9 @@ public class TCPconnection {
         // Send the packet using the socket
         this.socket.send(packet);
 
-        // Confirm the details of the sent packet
-        if (this.extra_logging) {
-            System.out.println("Sent packet details ---- Send Packet");
-            TCPmessageStatus tcpMessageSent = new TCPmessageStatus(packet.getData());
-            tcpMessageSent.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
-            System.out.println("Above is analystis of just sent packet.");
-        }
         // Log the sent packet
         tcpMessage.sent = true;
+        System.out.println("Sent packet details ---- Send Packet");
         tcpMessage.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
     }
 
@@ -688,6 +687,8 @@ public class TCPconnection {
         
         // Convert to TCPmessageStatus to print received message details
         TCPmessageStatus tcpMessage = new TCPmessageStatus(packet.getData());
+        // Print the received message details
+        System.out.println("Received packet details ---- Receive Packet");
         tcpMessage.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
         tcpMessage.received = true;
         

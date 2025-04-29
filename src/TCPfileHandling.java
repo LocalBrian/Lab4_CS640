@@ -85,9 +85,14 @@ public class TCPfileHandling {
      * @throws IOException
      */
     public void writeByteArrayToFile(byte[] data, int dataLength, int startByte) throws IOException {
+        
+        // Working data is data without first 24 bytes
+        byte[] workingData = new byte[dataLength];
+        System.arraycopy(data, 24, workingData, 0, dataLength);
+        
         // Write the byte array to the end of the file
         try (FileOutputStream fos = new FileOutputStream(this.file, true)) {
-            fos.write(data, startByte, dataLength);
+            fos.write(workingData);
             fos.flush();
         }
     }

@@ -35,9 +35,6 @@ public class TCPheader {
         this.timestamp = timestamp;
         this.dataLength = dataLength;
         this.SYN = SYN;
-        System.out.println("1SYN: " + SYN);
-        System.out.println("1FIN: " + FIN);
-        System.out.println("1ACK: " + ACK);
         this.FIN = FIN;
         this.ACK = ACK;
         this.data = data;
@@ -68,7 +65,7 @@ public class TCPheader {
         this.byteSequenceNumber = convertByteToInt(fullHeader, 0);
         this.acknowledgmentNumber = convertByteToInt(fullHeader, 4);
         this.timestamp = convertByteToLong(fullHeader, 8);
-        this.dataLength = (convertByteToInt(fullHeader, 16) >> 3) & 0xFFFF;
+        this.dataLength = (convertByteToInt(fullHeader, 16) >> 3);
         this.SYN = (convertByteToInt(fullHeader, 16) >> 2) & 0x1;
         this.FIN = (convertByteToInt(fullHeader, 16) >> 1) & 0x1;
         this.ACK = convertByteToInt(fullHeader, 16) & 0x1;
@@ -81,7 +78,7 @@ public class TCPheader {
         }
         
         // Print the parsed header fields
-        this.printData();
+        // this.printData();
 
         return true;
     }
@@ -92,7 +89,8 @@ public class TCPheader {
 
     private void buildHeaderStart() {
         // Create a byte array to hold the full header
-        this.fullHeader = new byte[24 + this.dataLength];
+        int totalLength = this.data.length + 24;
+        this.fullHeader = new byte[totalLength];
         // Print the header length
         System.out.println("Data length: " + this.data.length);
         System.out.println("Header length: " + this.fullHeader.length);
@@ -119,14 +117,9 @@ public class TCPheader {
         // Calculate the checksum -- also updates the checksum within the header
         checksumArray = calculateChecksum();
         System.arraycopy(checksumArray, 0, this.fullHeader, 22, checksumArray.length);
-        // Print the checksum array bits
-        System.out.println("Checksum array before calculation: ");
-        printByteBits(checksumArray);
-
     }
 
     public void setLengthAndStatus() {
-        
         // Bit shift left 3 places to make space for the flags
         int shiftedLength = this.dataLength << 3;
         // Combine the length and flags into a single integer

@@ -54,35 +54,22 @@ public class TCPdataTracker {
     }
 
     // For receiver, returns true if the packet can be acknowledged
-    public boolean receiverAddData(int start, int end, byte[] data) {
+    public boolean receiverAddData(int start, int length, byte[] data) {
         
-        // Confirm the data is the right length
-        if (data.length != end - start) {
-            System.out.println("Error: Data length does not match the specified range.");
-            return false;
-        }        
-        // Confirm that lastByteRcvd is equal to the start of the data
-        if (this.lastByteRcvd != start) {
-            System.out.println("Error: Data not received in order.");
-            return false;
-        }
-        
-        // Confirm the data is not too large
-        if (data.length > this.maxRcvBuffer) {
-            System.out.println("Error: Data exceeds maximum receive buffer size.");
-            return false;
-        }
+        // What is the length of the data?
+        System.out.println("Data start: " + start);
+        System.out.println("Data length in receiverAddData: " + length);     
 
         // Add the data using the file handler
         try {
-            fileHandler.writeByteArrayToFile(data, data.length, start);
+            fileHandler.writeByteArrayToFile(data, length, start);
         } catch (Exception e) {
             System.out.println("Error writing data to file: " + e.getMessage());
             return false;
         }
         // Update the last byte received
-        this.lastByteRcvd += data.length;
-        this.lastByteRead += data.length;
+        this.lastByteRcvd += length;
+        this.lastByteRead += length;
         
         return true;
     }

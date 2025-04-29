@@ -70,14 +70,14 @@ public class TCPmessageStatus {
         // Generate a TCP header with the data
         TCPheader message = new TCPheader();
 
-        System.out.println("Parsing message: " + byteMessage.length);
+        System.out.println("Total bytes received: " + byteMessage.length);
         
         // Parse the header
         if (message.parseReceivedTCP(byteMessage) == false) {
             throw new IllegalArgumentException("Message corrupted or invalid.");
         }
 
-        System.out.println("Parsed message: " + message.dataLength);
+        System.out.println("Parsed message data length: " + message.dataLength);
 
         // Set the parameters
         this.byteSequenceNumber = message.byteSequenceNumber;
@@ -154,7 +154,7 @@ public class TCPmessageStatus {
         long timeStamp = System.nanoTime();
 
         // Generate a TCP message with the data
-        TCPheader message = new TCPheader(byteSqnNum,ackNum,timestamp,0,this.SYN,this.FIN,this.ACK,data);
+        TCPheader message = new TCPheader(byteSqnNum,ackNum,timestamp,this.dataLength,this.SYN,this.FIN,this.ACK,data);
         this.message = message;
     }
 
