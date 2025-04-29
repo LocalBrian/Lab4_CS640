@@ -69,15 +69,11 @@ public class TCPmessageStatus {
 
         // Generate a TCP header with the data
         TCPheader message = new TCPheader();
-
-        System.out.println("Total bytes received: " + byteMessage.length);
         
         // Parse the header
         if (message.parseReceivedTCP(byteMessage) == false) {
             throw new IllegalArgumentException("Message corrupted or invalid.");
         }
-
-        System.out.println("Parsed message data length: " + message.dataLength);
 
         // Set the parameters
         this.byteSequenceNumber = message.byteSequenceNumber;
