@@ -231,7 +231,6 @@ public class TCPconnection {
 
         // Check if the packet is null
         if (responsePacket == null) {
-            System.out.println("No packet received within the timeout period of 60 seconds, closing the port and exiting.");
             return false;
         }
 
@@ -775,7 +774,9 @@ public class TCPconnection {
     private DatagramPacket receivePacket() throws IOException {
 
         // Set the timeOut for this listen
+        System.out.println("Setting timeout to " + this.timeout.getTimeOut() + " milliseconds.");
         this.socket.setSoTimeout(this.timeout.getTimeOut());
+        System.out.println("The socket has a timeout setting of: " + this.socket.getSoTimeout() + " milliseconds.");
         
         // Create datagram packet to receive data
         byte[] buffer = new byte[this.maxBytes];

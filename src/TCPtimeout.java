@@ -6,7 +6,7 @@ public class TCPtimeout {
     private long startTime; 
     public int timeOutTimer; //milliseconds
 
-    public void TCPtimeout() {
+    public TCPtimeout() {
         // Set default values
         System.out.println("Timeout of 5 seconds.");
         // 5 seconds in milliseconds
