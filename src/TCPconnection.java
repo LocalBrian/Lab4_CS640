@@ -328,6 +328,7 @@ public class TCPconnection {
                         System.out.println("Space for the data, storing packet.");
                         this.messageListIn.add(inTCP);
                     }
+                    // Any packets that are past the max units will be dropped
                 }
                 
                 // Check if the list in is empty
@@ -345,11 +346,10 @@ public class TCPconnection {
                 // Loop over the messages that were received
                 for (TCPmessageStatus message : this.messageListIn) {
                     // Check if the packet is previously received
-                    if (this.dataTracker.isDataReceived(inTCP.byteSequenceNumber + inTCP.dataLength) == true) {
+                    if (this.dataTracker.isDataReceived(inTCP.byteSequenceNumber)) {
                         // Send an ACK packet to the client
                         outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                         outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
-                        this.messageListOut.add(outTCP);
                         // Send the ACK packet to the client
                         sendAndWaitForResponse(outTCP, false); // Don't wait for a response
                         attempts = 0; // Reset the attempts counter something was received
@@ -358,32 +358,23 @@ public class TCPconnection {
                     else if (inTCP.verifyMessage(this.dataTracker.getNextExpectedByte() + 1, 1, 0, 0, 1) == true) {
                         // Process the received data bytes
                         this.dataTracker.receiverAddData(inTCP.byteSequenceNumber, inTCP.dataLength, inTCP.getMessage());
-                        break; // Exit the loop if the ACK data packet is received successfully
+                        // Acknowledge the received data
+                        outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
+                        outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
+                        sendAndWaitForResponse(outTCP, false); // Don't wait for a response
+
                     }
                 }
-                
-                // Just retry and drop the packet
-                attempts++;
 
-            }
-
-            // Send an ACK packet to the client
-            outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
-            outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
-            this.messageListOut.add(outTCP);
-
-            // Send the ACK packet to the client
-            sendAndWaitForResponse(outTCP, false); // Don't wait for a response
+            }            
 
             if (attempts == this.maxRetries) {
                 System.out.println("No packet received within the timeout period for data, closing the port and exiting.");
                 connectionLost = true;
             }
 
-            
         }
 
-        
         return false; // Return false to indicate connection was lost
     }
 

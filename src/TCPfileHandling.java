@@ -84,7 +84,7 @@ public class TCPfileHandling {
      * @param dataLength
      * @throws IOException
      */
-    public void writeByteArrayToFile(byte[] data, int dataLength, int startByte) throws IOException {
+    public void writeByteArrayToFile(byte[] data, int dataLength) throws IOException {
         
         // Working data is data without first 24 bytes
         byte[] workingData = new byte[dataLength];
@@ -200,7 +200,7 @@ public class TCPfileHandling {
         byte[] chunk;
         while ((chunk = targetfileWriter.readNextChunk()) != null) {
             // Write the chunk to the new file
-            targetfileWriter.writeByteArrayToFile(chunk, chunk.length, 0);
+            targetfileWriter.writeByteArrayToFile(chunk, chunk.length);
             bytesWritten += chunk.length;
         }
         System.out.println("Read " + bytesWritten + " bytes from file.");

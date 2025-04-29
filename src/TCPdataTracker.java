@@ -57,13 +57,12 @@ public class TCPdataTracker {
     // For receiver, returns true if the packet can be acknowledged
     public boolean receiverAddData(int start, int length, byte[] data) {
         
-        // What is the length of the data?
-        System.out.println("Data start: " + start);
-        System.out.println("Data length in receiverAddData: " + length);     
+        // Store start point
+        this.startPoints.add(start);   
 
         // Add the data using the file handler
         try {
-            fileHandler.writeByteArrayToFile(data, length, start);
+            fileHandler.writeByteArrayToFile(data, length);
         } catch (Exception e) {
             System.out.println("Error writing data to file: " + e.getMessage());
             return false;
@@ -76,10 +75,12 @@ public class TCPdataTracker {
     }
 
     // Check if the data has been received already
-    public boolean isDataReceived(int end) {
-        // Check if the data has been received already
-        if (end <= this.lastByteRcvd) {
-            return true;
+    public boolean isDataReceived(int startPoint) {
+        // Check if the start point is already in the list
+        for (int i = 0; i < this.startPoints.size(); i++) {
+            if (this.startPoints.get(i) == startPoint) {
+                return true;
+            }
         }
         return false;
     }
