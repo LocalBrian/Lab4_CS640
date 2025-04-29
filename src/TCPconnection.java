@@ -114,7 +114,7 @@ public class TCPconnection {
             }
 
             // Create the data tracker
-            this.dataTracker = new TCPdataTracker(true, this.maxUnitSize, this.fileHandler);
+            this.dataTracker = new TCPdataTracker(true, this.maxUnitSize, this.maxUnits, this.fileHandler);
 
         } else if (this.TCPmode == TCP_receiver) {
             // Server mode
@@ -126,10 +126,27 @@ public class TCPconnection {
             }
 
             // Create the data tracker
-            this.dataTracker = new TCPdataTracker(false, this.maxUnitSize, this.fileHandler);
+            this.dataTracker = new TCPdataTracker(false, this.maxUnitSize, this.maxUnits, this.fileHandler);
         }
 
         // Share data over the TCP connection
+        if (this.TCPmode == TCP_sender) {
+            // Client mode
+            System.out.println("Sending data...");
+            if (!clientSendData()) {
+                System.out.println("The client has lost connection.");
+                this.endTCPcommunication();
+                return false;
+            }
+        } else if (this.TCPmode == TCP_receiver) {
+            // Server mode
+            System.out.println("Receiving data...");
+            if (!serverReceiveData()) {
+                System.out.println("The server has lost connection.");
+                this.endTCPcommunication();
+                return false;
+            }
+        }
 
         // Communicate TCP connection end
 
@@ -167,6 +184,7 @@ public class TCPconnection {
         byte[] buffer = new byte[this.maxBytes];
         // DatagramPacket workingPacket = new DatagramPacket(buffer, buffer.length);
         DatagramPacket responsePacket = null;
+        TCPmessageStatus tcpMessageRCVack = null;
         int attempts = 0;
 
         // Listen for incoming packets for 60 seconds
@@ -227,7 +245,7 @@ public class TCPconnection {
         attempts = 0;
         while (attempts < this.maxRetries) {
 
-        TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(outTCP, true); 
+        tcpMessageRCVack = sendAndWaitForResponse(outTCP, true); 
 
         // Check if the packet is null
         if (tcpMessageRCVack == null) {
@@ -251,6 +269,8 @@ public class TCPconnection {
 
         // Add the received packet to the message list
         this.messageListIn.add(tcpMessageRCVack);
+
+        return true; // Return true to indicate success
     }
 
     /**
@@ -260,6 +280,7 @@ public class TCPconnection {
 
         // Initialize the variables for controlling the while loop
         boolean connectionLost = false;
+        TCPmessageStatus tcpMessageRCVack = null;
         int attempts;
 
         // Loop until either a null or a FIN packet is received
@@ -269,28 +290,47 @@ public class TCPconnection {
 
             while (attempts < this.maxRetries) {
             
-                TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(null, true);
+                tcpMessageRCVack = sendAndWaitForResponse(null, true);
 
                 // Check if the packet is null
                 if (tcpMessageRCVack == null) {
                     attempts++;
-                } // Check if the packet is a FIN packet, if so move to close
+                }
+                // Check if the packet is a FIN packet, if so move to close
                 else if (tcpMessageRCVack.verifyMessage(0, 0, 0, 1, 0) == true) {
                     System.out.println("Received FIN packet. Initiating close.");
                     return true;
-                } // Check if the packet is a data packet -- this needs configured for what to look for
-                else if (tcpMessageRCVack.verifyMessage(0, 0, 0, 1, 0) == true) {
+                }
+                // Check if the packet is previously received
+                else if (this.dataTracker.isDataReceived(tcpMessageRCVack.byteSequenceNumber + tcpMessageRCVack.dataLength) == true) {
+                    // Send an ACK packet to the client
+                    TCPmessageStatus outTCP = new TCPmessageStatus(1, tcpMessageRCVack.byteSequenceNumber + tcpMessageRCVack.dataLength);
+                    outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
+                    this.messageListOut.add(outTCP);
+                    // Send the ACK packet to the client
+                    sendAndWaitForResponse(outTCP, false); // Don't wait for a response
+                    attempts = 0; // Reset the attempts counter something was received
+                }
+                // Check if the packet is a data packet -- this needs configured for what to look for
+                else if (tcpMessageRCVack.verifyMessage(this.dataTracker.getNextExpectedByte(), 1, 0, 0, 1) == true) {
                     // Process the received data bytes
-                    this.dataTracker.receiverAddData(tcpMessageRCVack.byteSequenceNumber, tcpMessageRCVack.dataLength, tcpMessageRCVack.data);
+                    this.dataTracker.receiverAddData(tcpMessageRCVack.byteSequenceNumber, tcpMessageRCVack.dataLength, tcpMessageRCVack.getMessage());
                     break; // Exit the loop if the ACK data packet is received successfully
-                } else {
+                }
+                // Just retry and drop the packet
+                else {
                     attempts++;
                 }
 
             }
 
             // Store the received packet in the message list
-            this.messageListIn.add(tcpMessageRCVdata);
+            this.messageListIn.add(tcpMessageRCVack);
+
+            // Send an ACK packet to the client
+            TCPmessageStatus outTCP = new TCPmessageStatus(1, tcpMessageRCVack.byteSequenceNumber + tcpMessageRCVack.dataLength);
+            outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
+            this.messageListOut.add(outTCP);
 
             if (attempts == this.maxRetries) {
                 System.out.println("No packet received within the timeout period for data, closing the port and exiting.");
@@ -380,13 +420,13 @@ public class TCPconnection {
 
             while (attempts < this.maxRetries) {
             
-                TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(tcpMessageData, true);
+                tcpMessageRCVack = sendAndWaitForResponse(tcpMessageData, true);
 
                 // Check if the packet is null
                 if (tcpMessageRCVack == null) {
                     attempts++;
                 } // Check if the packet is an ACK packet -- this needs configured for what to look for
-                else if (tcpMessageRCVack.verifyMessage(1, tcpMessageData.dataLength + tcpMessageData.byteSequenceNumber, 0, 1, 0) == true) {
+                else if (tcpMessageRCVack.verifyMessage(1, tcpMessageData.dataLength + tcpMessageData.byteSequenceNumber, 0, 0, 1) == true) {
                     // Process the received data bytes
                     this.dataTracker.senderAckData();
                     break; // Exit the loop if the ACK data packet is received successfully
@@ -397,7 +437,7 @@ public class TCPconnection {
             }
 
             // Store the received packet in the message list
-            this.messageListIn.add(tcpMessageRCVdata);
+            this.messageListIn.add(tcpMessageRCVack);
 
             if (attempts == this.maxRetries) {
                 System.out.println("No packet received within the timeout period for data, closing the port and exiting.");
@@ -415,6 +455,7 @@ public class TCPconnection {
     public boolean clientCloseTCPconnection() {
         // Create a new DatagramPacket to receive the data
         byte[] buffer = new byte[this.maxBytes];
+        TCPmessageStatus tcpMessageRCVack = null;
         int attempts = 0;
 
         //  Create a new TCP message that is a SYN packet
@@ -425,7 +466,7 @@ public class TCPconnection {
         while (attempts < this.maxRetries) {
 
             // Send the FIN packet to the server and listen for a response
-            TCPmessageStatus tcpMessageRCVack = sendAndWaitForResponse(outTCP, true); 
+            tcpMessageRCVack = sendAndWaitForResponse(outTCP, true); 
 
             // Check if the packet is null
             if (tcpMessageRCVack == null) {
@@ -537,7 +578,7 @@ public class TCPconnection {
      * @return packet
      * @throws IOException
      */
-    private TCPmessageStatus sendAndWaitForResponse(TCPmessageStatus tcpMessage, boolean waitForResponse) {
+    private TCPmessageStatus sendAndWaitForResponse(TCPmessageStatus tcpMessage, boolean waitForResponse) { // Add triplicate packet option for parameter
         
         // Initialize
         DatagramPacket outPacket = null;
@@ -558,6 +599,8 @@ public class TCPconnection {
         byte[] buffer = new byte[this.maxBytes];
         DatagramPacket responsePacket = null;
 
+
+        // This is where we do triplicate packet if needed
         // Send a packet using the socket if there is one
         if (outPacket != null) {
             try {

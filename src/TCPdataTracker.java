@@ -15,14 +15,16 @@ import java.util.ArrayList;
 public class TCPdataTracker {
     // Attributes for sender or reciever
     // List of bytes
-    private byte[] dataManaged;
+    private ArrayList<byte[]> dataManaged;
     private TCPfileHandling fileHandler;
+    private int expectedChunkSize;
 
     // Attributes for the sender
     private int lastByteAcked;
     private int lastByteWritten;
     private int lastByteSent;
     private int maxSendBuffer;
+    private int currentChunkSize;
 
     // Attributes for the receiver
     private int lastByteRead;
@@ -31,23 +33,23 @@ public class TCPdataTracker {
 
 
     // For sender and receiver
-    public TCPdataTracker(boolean isSender, int chunkSize, TCPfileHandling fileHandler) {
+    public TCPdataTracker(boolean isSender, int chunkSize, int maxBuffer, TCPfileHandling fileHandler) {
         // Initialize the data tracker
-        this.dataManaged = byte[chunkSize];
         this.fileHandler = fileHandler;
-        this.currentChunkSize = 0;
+        this.expectedChunkSize = chunkSize;
 
         if (isSender) {
             // Initialize sender attributes
             this.lastByteAcked = 0;
             this.lastByteWritten = 0;
             this.lastByteSent = 0;
-            this.maxSendBuffer = chunkSize;
+            this.maxSendBuffer = maxBuffer;
+            this.currentChunkSize = 0;
         } else {
             // Initialize receiver attributes
             this.lastByteRead = 0;
             this.lastByteRcvd = 0;
-            this.maxRcvBuffer = chunkSize;
+            this.maxRcvBuffer = maxBuffer;
         }        
     }
 
@@ -85,11 +87,30 @@ public class TCPdataTracker {
         return true;
     }
 
+    // Check if the data has been received already
+    public boolean isDataReceived(int end) {
+        // Check if the data has been received already
+        if (end <= this.lastByteRcvd) {
+            return true;
+        }
+        return false;
+    }
+
+    // Next expected byte to be received
+    public int getNextExpectedByte() {
+        return this.lastByteRcvd;
+    }
+
     // For sender....
     public byte[] senderRetrieveData() {
-        
+        byte[] data = null;
         // Use hasnextchunk to pull next chunk of data
-        byte[] data = fileHandler.readNextChunk();
+        try {
+            data = fileHandler.readNextChunk();
+        } catch (Exception e) {
+            System.out.println("Error retrieving data chunk: " + e.getMessage());
+            return null;
+        }
         if (data == null) {
             this.currentChunkSize = 0;
             return null;
@@ -104,11 +125,6 @@ public class TCPdataTracker {
 
     // Acknowledge the data
     public void senderAckData() {
-        // Check if the ackNum is valid
-        if (ackNum < lastByteAcked || ackNum > lastByteSent) {
-            System.out.println("Error: Invalid acknowledgment number.");
-            return;
-        }
 
         // Update the last byte acknowledged
         this.lastByteAcked += this.currentChunkSize;
