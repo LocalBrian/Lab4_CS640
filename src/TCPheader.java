@@ -91,9 +91,6 @@ public class TCPheader {
         // Create a byte array to hold the full header
         int totalLength = this.data.length + 24;
         this.fullHeader = new byte[totalLength];
-        // Print the header length
-        System.out.println("Data length: " + this.data.length);
-        System.out.println("Header length: " + this.fullHeader.length);
         // Set the byte sequence number
         byte[] byteSequenceNumberArray = convertIntToByte(this.byteSequenceNumber);
         System.arraycopy(byteSequenceNumberArray, 0, this.fullHeader, 0, byteSequenceNumberArray.length);
