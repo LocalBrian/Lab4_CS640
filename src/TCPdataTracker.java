@@ -16,6 +16,7 @@ public class TCPdataTracker {
     // Attributes for sender or reciever
     // List of bytes
     private ArrayList<byte[]> dataManaged;
+    private ArrayList<Integer> startPoints;
     private TCPfileHandling fileHandler;
     private int expectedChunkSize;
 
