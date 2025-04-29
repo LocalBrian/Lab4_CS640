@@ -56,6 +56,7 @@ public class TCPconnection {
         this.isClosed = true;
         this.fileHandler = fileHandler;
         this.targetPort = targetPort;
+        this.maxUnits = 10;
         try {
             this.targetIPAddress = InetAddress.getByName(string_ipAddress);
         } catch (UnknownHostException e) {
@@ -408,7 +409,7 @@ public class TCPconnection {
         int currentWindow = 1;
         int currentByteSqnNumber = 1;
         boolean finalRound = false;
-        int activeMessagesAcked = 0;
+        int activeMessagesAcked;
         
 
         // Loop until either a null or a FIN packet is received
@@ -416,6 +417,7 @@ public class TCPconnection {
 
             attempts = 0;
             count = 0;
+            activeMessagesAcked = 0;
 
             // Build list of messages to be sent in a wave
             this.messageListOut = new ArrayList <TCPmessageStatus>();
@@ -435,25 +437,33 @@ public class TCPconnection {
                 currentByteSqnNumber += data.length;
             }
 
+            // Total messages in this round
+            System.out.println("Total messages in this round: " + this.messageListOut.size());
+
             while (attempts < this.maxRetries) {
+
+                System.out.println("Attempt number: " + attempts);
                 
                 // Loop over the messages to be sent
                 for (TCPmessageStatus message : this.messageListOut) {
+                    System.out.println("Checking message: " + message.byteSequenceNumber);
                     // Send the packet using the socket
                     if (message.acknowledged == false) {
                         // Send the packet using the socket
                         tcpMessageRCVack = sendAndWaitForResponse(message, false);
+                        System.out.println("Sent message: " + message.byteSequenceNumber);
                     }
                     
                 }
 
                 // While loop waiting for ACK
-                if (tcpMessageRCVack != null) {
+                while (true) {
                     // Wait for a packet to come in
                     tcpMessageRCVack = sendAndWaitForResponse(null, true);
 
                     // If the packet is null, break out of this loop
                     if (tcpMessageRCVack == null) {
+                        System.out.println("Breaking out of listening loop, no packet received.");
                         break;
                     } 
                     // See if it matches one of the messages we sent
@@ -473,9 +483,16 @@ public class TCPconnection {
                         }
 
                     }
-                    System.out.println("Exited message loop check");
-                    break;
+                    if (activeMessagesAcked == this.messageListOut.size()) {
+                        System.out.println("All messages acknowledged.");
+                        break; // Exit the loop if all messages are acknowledged
+                    }
+                    else {
+                        System.out.println("Not all messages acknowledged, waiting for more packets.");
+                    }
                 }
+
+                System.out.println("Exited message loop check");
 
                 // Check if active messages acknowledged is equal to the number of messages sent
                 if (activeMessagesAcked == this.messageListOut.size()) {
@@ -484,6 +501,7 @@ public class TCPconnection {
                         currentWindow = Math.min(currentWindow *2, this.maxUnits);
                     } else {
                         currentWindow = Math.min(currentWindow /2, this.maxUnits);
+                        currentWindow = Math.max(currentWindow, 1);
                     }
                     // All messages have been acknowledged, break out of the loop
                     break;
@@ -575,11 +593,6 @@ public class TCPconnection {
         
         // Convert data to TCP message
         TCPmessageStatus tcpMessage = new TCPmessageStatus(data);
-        // printe message details
-        if (this.extra_logging) {
-            System.out.println("TCP data in ---- create packet 1");
-            tcpMessage.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
-        }
         
         // Create a new DatagramPacket with the specified data and address
         try {
