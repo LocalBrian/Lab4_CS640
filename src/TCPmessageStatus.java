@@ -159,6 +159,20 @@ public class TCPmessageStatus {
     }
 
     /**
+     * Flag that message is acknowledged
+     */
+    public void setAcknowledged() {
+        this.acknowledged = true;
+    }
+
+    /**
+     * Get if the message is acknowledged
+     */
+    public boolean isAcknowledged() {
+        return this.acknowledged;
+    }
+
+    /**
      * Returns a byte array for a message with data
      * @return byte array with the sender startup message
      */

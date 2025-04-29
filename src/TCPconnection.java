@@ -399,55 +399,100 @@ public class TCPconnection {
     public boolean clientSendData() {
         // Initialize the variables for controlling the while loop
         boolean connectionLost = false;
-        int attempts;
+        int attempts = 0;
+        int count;
         TCPmessageStatus tcpMessageData = new TCPmessageStatus(0, 0);
         TCPmessageStatus tcpMessageRCVack = new TCPmessageStatus(0, 0);
         TCPmessageStatus lastSuccMess = null;
         byte[] data = null;
+        int currentWindow = 1;
+        int currentByteSqnNumber = 1;
+        boolean finalRound = false;
+        int activeMessagesAcked = 0;
+        
 
         // Loop until either a null or a FIN packet is received
-        while (connectionLost == false) {
+        while (connectionLost == false && finalRound == false) {
 
             attempts = 0;
+            count = 0;
 
-            // Last successful message and data to be sent
-            lastSuccMess = this.messageListOut.get(this.messageListOut.size() - 1);
-            data = this.dataTracker.senderRetrieveData();
+            // Build list of messages to be sent in a wave
+            this.messageListOut = new ArrayList <TCPmessageStatus>();
 
-            // Check if data is null, if so move to close connection
-            if (data == null) {
-                return true;
+            while (count < currentWindow) {
+                // Create a new TCP message that is a data packet
+                tcpMessageData = new TCPmessageStatus(0, 0);
+                data = this.dataTracker.senderRetrieveData();
+                // Check if the data is null, if so move to close connection
+                if (data == null) {
+                    finalRound = true;
+                    break; // Exit the loop if the ACK data packet is received successfully
+                }
+                tcpMessageData.setDataMessage(currentByteSqnNumber, 1, data);
+                this.messageListOut.add(tcpMessageData);
+                count++;
+                currentByteSqnNumber += data.length;
             }
-
-            // Build message that will be sent
-            tcpMessageData.setDataMessage(lastSuccMess.dataLength + lastSuccMess.byteSequenceNumber, 1, data);
 
             while (attempts < this.maxRetries) {
-            
-                tcpMessageRCVack = sendAndWaitForResponse(tcpMessageData, true);
-
-                // Check if the packet is null
-                if (tcpMessageRCVack == null) {
-                    attempts++;
-                } // Check if the packet is an ACK packet -- this needs configured for what to look for
-                else if (tcpMessageRCVack.verifyMessage(1, tcpMessageData.dataLength + tcpMessageData.byteSequenceNumber, 0, 0, 1) == true) {
-                    // Process the received data bytes
-                    this.dataTracker.senderAckData();
-                    break; // Exit the loop if the ACK data packet is received successfully
-                } else {
-                    attempts++;
+                
+                // Loop over the messages to be sent
+                for (TCPmessageStatus message : this.messageListOut) {
+                    // Send the packet using the socket
+                    if (message.acknowledged == false) {
+                        // Send the packet using the socket
+                        tcpMessageRCVack = sendAndWaitForResponse(message, false);
+                    }
+                    
                 }
+
+                // While loop waiting for ACK
+                while (tcpMessageRCVack == null) {
+                    // Wait for a packet to come in
+                    tcpMessageRCVack = sendAndWaitForResponse(null, true);
+
+                    // If the packet is null, break out of this loop
+                    if (tcpMessageRCVack == null) {
+                        break;
+                    } 
+                    // See if it matches one of the messages we sent
+                    for (TCPmessageStatus message : this.messageListOut) {
+                        if (tcpMessageRCVack.verifyMessage(message.byteSequenceNumber, 1, 0, 0, 1) == true) {
+                            // Check if the message is already acknowledged
+                            if (message.isAcknowledged() == true) {
+                                System.out.println("Message already acknowledged, skipping.");
+                                continue; // Skip to the next message
+                            } // Increment the active messages acknowledged and mark the message as acknowledged
+                            else {
+                                message.setAcknowledged();
+                                activeMessagesAcked++;
+                            }
+                            
+                        }
+                    }
+                }
+
+                // Check if active messages acknowledged is equal to the number of messages sent
+                if (activeMessagesAcked == this.messageListOut.size()) {
+                    // If the first attempt, then increase the window size
+                    if (attempts == 0) {
+                        currentWindow = Math.min(currentWindow *2, this.maxUnits);
+                    } else {
+                        currentWindow = Math.min(currentWindow /2, this.maxUnits);
+                    }
+                    // All messages have been acknowledged, break out of the loop
+                    break;
+                }
+
+                attempts++;
 
             }
 
-            // Store the received packet in the message list
-            this.messageListIn.add(tcpMessageRCVack);
-
+            }
             if (attempts == this.maxRetries) {
                 System.out.println("No packet received within the timeout period for data, closing the port and exiting.");
                 connectionLost = true;
-            }
-   
         }
         
         return false; // Return false to indicate connection was lost
