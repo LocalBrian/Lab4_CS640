@@ -115,6 +115,7 @@ public class TCPmessageStatus {
         this.SYN = eSYN;
         this.FIN = eFIN;
         this.ACK = eACK;
+        this.sent = true;
 
         this.timestamp = timestamp;
 

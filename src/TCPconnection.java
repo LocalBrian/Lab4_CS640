@@ -110,8 +110,7 @@ public class TCPconnection {
         this.packetsReceived = 0; // Number of packets received
         this.outOfSequencePacketsDiscarded = 0; // Number of out of sequence packets discarded
         this.badChecksumPacketsDiscarded = 0; // Number of packets discarded due to bad checksum
-        this.retransmissions = 0; // Number of retransmissions
-        this.duplicateAcksGlobal = 0; // Number of duplicate ACKs received
+        this.duplicateAcksGlobal = 0; // Number of duplicate ACKs sent
     }
 
 
@@ -228,9 +227,36 @@ public class TCPconnection {
         this.isOpen = false;
         this.isConnected = false;
         this.isClosed = true;
+        if (this.TCPmode == TCP_sender) {
+            this.printStatisticsClient();
+        }
+        else if (this.TCPmode == TCP_receiver) {
+            this.printStatisticsServer();
+        }
         System.out.println("TCP connection closed.");
 
         // Print the statistics
+    }
+
+    public void printStatisticsServer() {
+        System.out.println("TCP Server connection statistics:");
+        System.out.println("Data Received: " + this.fileHandler.totalData + " bytes");
+        System.out.println("Packets sent: " + this.packetsSent);
+        System.out.println("Packets received: " + this.packetsReceived);
+        System.out.println("Out of sequence packets discarded: " + this.outOfSequencePacketsDiscarded);
+        System.out.println("Packets discarded due to incorrect checksum: " + this.badChecksumPacketsDiscarded);
+        System.out.println("Duplicate ACKs sent: " + this.duplicateAcksGlobal);
+    }
+
+    public void printStatisticsClient() {
+        System.out.println("TCP Client connection statistics:");
+        System.out.println("Data Sent: " + this.fileHandler.totalData + " bytes");
+        System.out.println("Packets sent: " + this.packetsSent);
+        System.out.println("Packets received: " + this.packetsReceived);
+        System.out.println("Out of sequence packets discarded: " + this.outOfSequencePacketsDiscarded);
+        System.out.println("Bad checksum packets discarded: " + this.badChecksumPacketsDiscarded);
+        System.out.println("Retransmissions: " + this.retransmissions);
+        System.out.println("Duplicate ACKs received: " + this.duplicateAcksGlobal);
     }
 
     /**************************************************** Server communication methods ****************************************************/
@@ -261,7 +287,6 @@ public class TCPconnection {
             // Check if the packet is null
             if (responsePacket == null) {
                 if (this.timeout.isTimedOut(System.nanoTime(), lastSentTime)) {
-                    System.out.println("Timeout occurred, resending SYN-ACK packet.");
                     lastSentTime = System.nanoTime();
                     attempts++;
                 }
@@ -311,6 +336,7 @@ public class TCPconnection {
                 System.out.println("Timeout occurred, resending SYN-ACK packet.");
                 sendAndWaitForResponse(outTCP, false);
                 lastSentTime = System.nanoTime();
+                this.duplicateAcksGlobal++;
                 attempts++;
             }
 
@@ -377,6 +403,7 @@ public class TCPconnection {
                         outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                         outTCP.setDatalessMessage(0, 0, 1, inTCP.timestamp); // SYN = 0, ACK = 1, FIN = 0
                         this.sendAndWaitForResponse(outTCP, false);
+                        this.duplicateAcksGlobal++;
                         continue; // Skip to the next packet
                     }
                     // Check if there is space in message list in
@@ -395,6 +422,7 @@ public class TCPconnection {
                                 outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                                 outTCP.setDatalessMessage(0, 0, 1, inTCP.timestamp); // SYN = 0, ACK = 1, FIN = 0
                                 this.sendAndWaitForResponse(outTCP, false);
+                                this.duplicateAcksGlobal++;
                                 break; // Skip to the next message
                             } else if (inTCP.byteSequenceNumber < this.messageListIn.get(position).byteSequenceNumber) {
                                 System.out.println("Packet is before the current packet, inserting.");
@@ -419,11 +447,13 @@ public class TCPconnection {
                                 outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                                 outTCP.setDatalessMessage(0, 0, 1, inTCP.timestamp); // SYN = 0, ACK = 1, FIN = 0
                                 this.sendAndWaitForResponse(outTCP, false);
+                                this.duplicateAcksGlobal++;
                                 break; // Skip to the next message
                             } else if (inTCP.byteSequenceNumber < this.messageListIn.get(position).byteSequenceNumber) {
                                 System.out.println("Packet is before the current packet, inserting and popping back item.");
                                 this.messageListIn.remove(this.messageListIn.size() - 1); // Remove the last item
                                 this.messageListIn.add(position, inTCP);
+                                this.outOfSequencePacketsDiscarded++;
                                 break; // Exit the loop if the packet is inserted
                             } else {
                                 position++;
@@ -509,6 +539,7 @@ public class TCPconnection {
                 sendAndWaitForResponse(outTCP, false);
                 lastSentTime = System.nanoTime();
                 attempts++;
+                this.duplicateAcksGlobal++;
             }
             inTCP = sendAndWaitForResponse(null, true);
             // Check if the packet is null
@@ -518,9 +549,7 @@ public class TCPconnection {
             else if (inTCP.verifyMessage(this.dataTracker.getNextExpectedByte() +1, 2, 0, 0, 1) == true) {
                 System.out.println("Received packet is an FIN-ACK packet. Closing connection.");
                 break;
-            } else {
-                sendAndWaitForResponse(outTCP, false);
-            }
+            } 
         }
 
         return true; // Return true to indicate success
@@ -552,6 +581,7 @@ public class TCPconnection {
                 System.out.println("Timeout occurred, resending SYN packet.");
                 outTCP.resetMessage();
                 sendAndWaitForResponse(outTCP, false);
+                this.retransmissions++;
                 attempts++;
             }
 
@@ -583,6 +613,7 @@ public class TCPconnection {
         sendAndWaitForResponse(outTCP2, false); 
         sendAndWaitForResponse(outTCP2, false);
         sendAndWaitForResponse(outTCP2, false);
+        this.retransmissions += 2;
 
         return true; // Return true to indicate success
     }
@@ -675,6 +706,7 @@ public class TCPconnection {
                             this.messageListOut.set(count, activeMessage);
                             // Resend the message
                             sendAndWaitForResponse(activeMessage, false);
+                            this.retransmissions++;
                         }
                         count++;
                     }
@@ -700,6 +732,7 @@ public class TCPconnection {
                     if (this.dataTracker.isDataAcked(tcpMessageRCVack.acknowledgmentNumber)) {
                         System.out.println("Packet already acknowledged, skipping.");
                         duplicateAckCount++;
+                        this.duplicateAcksGlobal++;
                         continue; // Skip to the next packet
                     }
                     else {
@@ -738,6 +771,7 @@ public class TCPconnection {
                                 activeMessage.resetMessage();
                                 // Resend the message
                                 sendAndWaitForResponse(activeMessage, false);
+                                this.retransmissions++;
                                 // Replace the message in the list
                                 this.messageListOut.set(count, activeMessage);
                                 count++;
@@ -795,6 +829,7 @@ public class TCPconnection {
                 System.out.println("Timeout occurred, resending FIN packet.");
                 outTCP.resetMessage();
                 sendAndWaitForResponse(outTCP, false);
+                this.retransmissions++;
                 attempts++;
             }
 
@@ -822,6 +857,7 @@ public class TCPconnection {
         sendAndWaitForResponse(outTCP2, false); 
         sendAndWaitForResponse(outTCP2, false);
         sendAndWaitForResponse(outTCP2, false);
+        this.retransmissions+= 2;
 
         return true; // Return true to indicate success
     }
@@ -984,7 +1020,7 @@ public class TCPconnection {
 
         // Log the sent packet
         tcpMessage.sent = true;
-        System.out.println("Sent packet details ---- Send Packet");
+        this.packetsSent++;
         tcpMessage.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
     }
 
@@ -1003,6 +1039,11 @@ public class TCPconnection {
 
         // Receive the packet using the socket
         this.socket.receive(packet);
+
+        // Increment counter
+        this.packetsReceived++;
+
+        
         
         // Convert to TCPmessageStatus to print received message details
         TCPmessageStatus tcpMessage = new TCPmessageStatus(packet.getData());
@@ -1010,6 +1051,13 @@ public class TCPconnection {
         System.out.println("Received packet details ---- Receive Packet");
         tcpMessage.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
         tcpMessage.received = true;
+
+        // Check if the checksum is valid
+        if (tcpMessage.message.validateChecksum() == false) {
+            System.out.println("Checksum error, dropping packet.");
+            this.badChecksumPacketsDiscarded++;
+            return null; // Checksum error, drop the packet
+        }
         
         // Return the packet
         return packet;

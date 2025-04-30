@@ -19,18 +19,21 @@ public class TCPfileHandling {
     private int chunkSize;
     private int currentPosition;
     public int currentChunkSize; // Size of the current chunk read
+    public int totalData;
 
     public TCPfileHandling(String filePath, int chunkSize) {
         this.filePath = filePath;
         this.file = new File(filePath);
         this.chunkSize = chunkSize;
         this.currentPosition = 0;
+        this.totalData = 0;
     }
 
     public TCPfileHandling(String filePath) {
         this.filePath = filePath;
         this.file = new File(filePath);
         this.currentPosition = 0;
+        this.totalData = 0;
     }
 
     public byte[] readNextChunk() throws IOException {
@@ -43,6 +46,8 @@ public class TCPfileHandling {
         // Calculate the size of the next chunk
         int remainingBytes = (int) (file.length() - currentPosition);
         int bytesToRead = Math.min(chunkSize, remainingBytes);
+
+        this.totalData += bytesToRead;
 
         // Create a byte array to hold the chunk data
         byte[] chunkData = new byte[bytesToRead];
@@ -77,6 +82,7 @@ public class TCPfileHandling {
         return this.currentPosition;
     }
 
+
     /**
      * This method will take a byte array and write it to the end of a file.
      * 
@@ -89,6 +95,8 @@ public class TCPfileHandling {
         // Working data is data without first 24 bytes
         byte[] workingData = new byte[dataLength];
         System.arraycopy(data, 24, workingData, 0, dataLength);
+
+        this.totalData += workingData.length;
         
         // Write the byte array to the end of the file
         try (FileOutputStream fos = new FileOutputStream(this.file, true)) {
