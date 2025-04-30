@@ -17,6 +17,7 @@ public class TCPdataTracker {
     // List of bytes
     private ArrayList<byte[]> dataManaged;
     private ArrayList<Integer> startPoints;
+    private ArrayList<Integer> completedData;
     private TCPfileHandling fileHandler;
     private int expectedChunkSize;
 
@@ -46,6 +47,7 @@ public class TCPdataTracker {
             this.lastByteSent = 0;
             this.maxSendBuffer = maxBuffer;
             this.currentChunkSize = 0;
+            this.completedData = new ArrayList<>();
         } else {
             // Initialize receiver attributes
             this.lastByteRead = 0;
@@ -124,5 +126,25 @@ public class TCPdataTracker {
     public boolean hasDataToSend() {
         // Check if there is data to send
         return this.lastByteSent < this.lastByteAcked + this.maxSendBuffer;
+    }
+
+    // Copmpleted data
+    public void addAckedData(int ackNumber) {
+        // Add the completed data to the list
+        this.completedData.add(ackNumber);
+    }
+
+    // Is data previously acknowledged
+    public boolean isDataAcked(int ackNumber) {
+        if (this.completedData.isEmpty()) {
+            return false; // No data has been acknowledged yet
+        }
+        // Check if the ack number is in the list
+        for (int i = 0; i < this.completedData.size(); i++) {
+            if (this.completedData.get(i) == ackNumber) {
+                return true;
+            }
+        }
+        return false;
     }
 }

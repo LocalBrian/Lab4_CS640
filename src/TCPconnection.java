@@ -584,6 +584,7 @@ public class TCPconnection {
         boolean finalRound = false;
         int activeMessagesAcked;
         boolean resendOccurred = false;
+        int duplicateAckCount = 0;
         
 
         // Loop until either a null or a FIN packet is received
@@ -627,6 +628,8 @@ public class TCPconnection {
                 }
                 
             }
+
+            duplicateAckCount = 0;
 
             while (true) {
             
@@ -672,28 +675,54 @@ public class TCPconnection {
                     
                     // See if it matches one of the messages we sent
                     count = 0;
-                    while (count < this.messageListOut.size()) {
-                        activeMessage = this.messageListOut.get(count);
-                        System.out.println("Checking message: " + activeMessage.byteSequenceNumber + activeMessage.dataLength);
 
-                        if (tcpMessageRCVack.verifyMessage( 1, activeMessage.byteSequenceNumber + activeMessage.dataLength, 0, 0, 1) == true) {
-                            System.out.println("Message acknowledged: " + activeMessage.byteSequenceNumber);
-                            this.messageListOut.remove(count);
-                            break;
-                        } // Check if message should be resent
-                        else {
-                            System.out.println("Message not acknowledged: " + activeMessage.byteSequenceNumber);
-                        }
-                        count++;
+                    // See if previously acked
+                    if (this.dataTracker.isDataAcked(tcpMessageRCVack.acknowledgmentNumber)) {
+                        System.out.println("Packet already acknowledged, skipping.");
+                        duplicateAckCount++;
+                        continue; // Skip to the next packet
                     }
+                    else {
+                        while (count < this.messageListOut.size()) {
+                            activeMessage = this.messageListOut.get(count);
+                            System.out.println("Checking message: " + activeMessage.byteSequenceNumber + activeMessage.dataLength);
+
+                            if (tcpMessageRCVack.verifyMessage( 1, activeMessage.byteSequenceNumber + activeMessage.dataLength, 0, 0, 1) == true) {
+                                System.out.println("Message acknowledged: " + activeMessage.byteSequenceNumber);
+                                this.messageListOut.remove(count);
+                                this.dataTracker.addAckedData(tcpMessageRCVack.acknowledgmentNumber);
+                                break;
+                            } 
+                            count++;
+                        }
+                    }
+
+
 
                     System.out.println("Total messages still needing verified: " + this.messageListOut.size());
                     if (0 == this.messageListOut.size()) {
                         System.out.println("All messages acknowledged.");
+                        duplicateAckCount = 0;
                         break; // Exit the loop if all messages are acknowledged
                     }
                     else {
                         System.out.println("Not all messages acknowledged, waiting for more packets.");
+                        if (duplicateAckCount >= 3) {
+                            System.out.println("Duplicate ACKs received, resending all messages.");
+                            resendOccurred = true;
+                            // Resend all messages
+                            count = 0;
+                            while (count < this.messageListOut.size()) {
+                                activeMessage = this.messageListOut.get(count);
+                                activeMessage.sendAttempts++;
+                                activeMessage.resetMessage();
+                                // Resend the message
+                                sendAndWaitForResponse(activeMessage, false);
+                                // Replace the message in the list
+                                this.messageListOut.set(count, activeMessage);
+                            }
+                            duplicateAckCount = 0;
+                        }
                     }
                 }
 
@@ -954,7 +983,7 @@ public class TCPconnection {
         this.socket.receive(packet);
 
         // There is a random 1 in 10 chance that the packet is dropped to simulate a lost packet
-        if (Math.random() < 0.2) { 
+        if (Math.random() < 0.05) { 
             System.out.println("Simulated packet loss, dropping packet.");
             return null; // Simulate packet loss
         }
