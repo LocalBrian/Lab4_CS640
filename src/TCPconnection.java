@@ -65,7 +65,7 @@ public class TCPconnection {
         this.isClosed = true;
         this.fileHandler = fileHandler;
         this.targetPort = targetPort;
-        this.maxUnits = 10;
+        this.maxUnits = maxUnits;
         this.maxRetries = 16;
         try {
             this.targetIPAddress = InetAddress.getByName(string_ipAddress);
