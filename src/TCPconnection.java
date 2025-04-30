@@ -41,6 +41,14 @@ public class TCPconnection {
     private int maxBytes = 1518; // Maximum bytes to expect in a packet
     private int maxRetries; // Maximum number of retries for sending a packet
 
+    // Project specific parametrs
+    private int packetsSent; // Number of packets sent
+    private int packetsReceived; // Number of packets received
+    private int outOfSequencePacketsDiscarded; // Number of out of sequence packets discarded
+    private int badChecksumPacketsDiscarded; // Number of packets discarded due to bad checksum
+    private int retransmissions; // Number of retransmissions
+    private int duplicateAcksGlobal; // Number of duplicate ACKs received
+
     /**
      * This is for creating a new instance of TCPconnection for a client
      * @param fileHandler The instance of the file handler
@@ -68,6 +76,12 @@ public class TCPconnection {
         this.messageListIn = new ArrayList <TCPmessageStatus>();
         this.messageListOut = new ArrayList <TCPmessageStatus>();
         this.timeout = new TCPtimeout();
+        // Project specific parametrs
+        this.packetsSent = 0; // Number of packets sent
+        this.packetsReceived = 0; // Number of packets received
+        this.badChecksumPacketsDiscarded = 0; // Number of packets discarded due to bad checksum
+        this.retransmissions = 0; // Number of retransmissions
+        this.duplicateAcksGlobal = 0; // Number of duplicate ACKs received
     }
 
     /**
@@ -91,6 +105,13 @@ public class TCPconnection {
         this.messageListOut = new ArrayList <TCPmessageStatus>();
         this.timeout = new TCPtimeout();
         this.maxRetries = 16;
+        // Project specific parametrs
+        this.packetsSent = 0; // Number of packets sent
+        this.packetsReceived = 0; // Number of packets received
+        this.outOfSequencePacketsDiscarded = 0; // Number of out of sequence packets discarded
+        this.badChecksumPacketsDiscarded = 0; // Number of packets discarded due to bad checksum
+        this.retransmissions = 0; // Number of retransmissions
+        this.duplicateAcksGlobal = 0; // Number of duplicate ACKs received
     }
 
 
@@ -208,6 +229,8 @@ public class TCPconnection {
         this.isConnected = false;
         this.isClosed = true;
         System.out.println("TCP connection closed.");
+
+        // Print the statistics
     }
 
     /**************************************************** Server communication methods ****************************************************/
