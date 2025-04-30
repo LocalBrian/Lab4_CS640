@@ -599,8 +599,7 @@ public class TCPconnection {
      */
     public boolean clientSendData() {
         // Initialize the variables for controlling the while loop
-        boolean connectionLost = false;
-        int attempts = 0;
+        int attempts;
         int count;
         TCPmessageStatus tcpMessageData = new TCPmessageStatus(0, 0);
         TCPmessageStatus tcpMessageRCVack = new TCPmessageStatus(0, 0);
@@ -623,7 +622,6 @@ public class TCPconnection {
 
             // Build list of messages to be sent in a wave
             this.messageListOut = new ArrayList <TCPmessageStatus>();
-
             while (count < currentWindow) {
                 // Create a new TCP message that is a data packet
                 tcpMessageData = new TCPmessageStatus(0, 0);
@@ -635,20 +633,13 @@ public class TCPconnection {
                     break; // Exit the loop if the ACK data packet is received successfully
                 }
                 tcpMessageData.setDataMessage(currentByteSqnNumber, 1, data);
+                // Set the timestamp for the message
+                tcpMessageData.resetMessage();
+                // send the packet and store it
+                sendAndWaitForResponse(tcpMessageData, false);
                 this.messageListOut.add(tcpMessageData);
                 count++;
                 currentByteSqnNumber += data.length;
-            }
-
-            // Loop over the messages to be sent
-            for (TCPmessageStatus message : this.messageListOut) {
-                // Send the packet using the socket
-                if (message.acknowledged == false) {
-                    // Send the packet using the socket
-                    message.resetMessage();
-                    sendAndWaitForResponse(message, false);
-                }
-                
             }
 
             duplicateAckCount = 0;
@@ -686,7 +677,7 @@ public class TCPconnection {
                     // Wait for a packet to come in
                     tcpMessageRCVack = sendAndWaitForResponse(null, true);
 
-                    // If the packet is null, break out of this loop
+                    // If the packet is null, break out of the inner loop
                     if (tcpMessageRCVack == null) {
                         break;
                     } 
@@ -694,8 +685,7 @@ public class TCPconnection {
                     // Update the timeout timer based on the message
                     this.timeout.updateTimeOut(System.nanoTime(), tcpMessageRCVack.timestamp);
                     
-                    // See if it matches one of the messages we sent
-                    count = 0;
+                    
 
                     // See if previously acked
                     if (this.dataTracker.isDataAcked(tcpMessageRCVack.acknowledgmentNumber)) {
@@ -704,6 +694,8 @@ public class TCPconnection {
                         continue; // Skip to the next packet
                     }
                     else {
+                        // See if it matches one of the messages we sent
+                        count = 0;
                         while (count < this.messageListOut.size()) {
                             activeMessage = this.messageListOut.get(count);
 
@@ -722,10 +714,11 @@ public class TCPconnection {
                         duplicateAckCount = 0;
                         break; // Exit the loop if all messages are acknowledged
                     }
+                    // Resend all unacknowledged messages if duplicate ACKs are received
                     else {
                         if (duplicateAckCount >= 3) {
                             resendOccurred = true;
-                            // Resend all messages
+                            // Resend all active messages
                             count = 0;
                             while (count < this.messageListOut.size()) {
                                 activeMessage = this.messageListOut.get(count);
@@ -773,10 +766,8 @@ public class TCPconnection {
      */
     public boolean clientCloseTCPconnection() {
         // Create a new DatagramPacket to receive the data
-        byte[] buffer = new byte[this.maxBytes];
         TCPmessageStatus inTCP = null;
         int attempts = 0;
-        int temp;
 
         //  Create a new TCP message that is a FIN packet
         TCPmessageStatus outTCP = new TCPmessageStatus(this.finBytSeqNum, 1);
@@ -793,7 +784,6 @@ public class TCPconnection {
 
             // Listen for a response
             inTCP = sendAndWaitForResponse(null, true); 
-            temp = outTCP.byteSequenceNumber +1;
 
             // Check if the packet is null
             if (inTCP == null) {
@@ -828,13 +818,13 @@ public class TCPconnection {
      * @param data
      * @return
      */
-    private String byteArrayToString(byte[] data) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : data) {
-            sb.append((char) b);
-        }
-        return sb.toString();
-    }
+    // private String byteArrayToString(byte[] data) {
+    //     StringBuilder sb = new StringBuilder();
+    //     for (byte b : data) {
+    //         sb.append((char) b);
+    //     }
+    //     return sb.toString();
+    // }
 
     /**
      * This method will create a packet for sending data.
@@ -941,7 +931,7 @@ public class TCPconnection {
         if (tcpMessageRCV == null) {
             return null;
         }
-        // tcpMessageRCV.printMessageDetails(System.nanoTime() - this.timeout.getStartTime());
+        
 
         // Return the received packet
         return tcpMessageRCV;
