@@ -167,6 +167,8 @@ public class TCPconnection {
             // Create the data tracker
             this.dataTracker = new TCPdataTracker(false, this.maxUnitSize, this.maxUnits, this.fileHandler);
         }
+        this.isConnected = true;
+        this.isClosed = false;
 
         // Share data over the TCP connection
         if (this.TCPmode == TCP_sender) {
@@ -237,11 +239,15 @@ public class TCPconnection {
             this.printStatisticsServer();
         }
         System.out.println("TCP connection closed.");
+        this.isOpen = false;
+        this.isConnected = false;
+        this.isClosed = true;
 
         // Print the statistics
     }
 
     public void printStatisticsServer() {
+        System.out.println("---------------------------------");
         System.out.println("TCP Server connection statistics:");
         System.out.println("Data Received: " + this.fileHandler.totalData + " bytes");
         System.out.println("Packets sent: " + this.packetsSent);
@@ -253,6 +259,7 @@ public class TCPconnection {
     }
 
     public void printStatisticsClient() {
+        System.out.println("---------------------------------");
         System.out.println("TCP Client connection statistics:");
         System.out.println("Data Sent: " + this.fileHandler.totalData + " bytes");
         System.out.println("Packets sent: " + this.packetsSent);
@@ -269,8 +276,6 @@ public class TCPconnection {
      * This method is for when the server is attempting to establish a connection with the client.
      */
     public boolean serverOpenListeningState() {
-        // Create a new DatagramPacket to receive the data
-        byte[] buffer = new byte[this.maxBytes];
         // DatagramPacket workingPacket = new DatagramPacket(buffer, buffer.length);
         DatagramPacket responsePacket = null;
         TCPmessageStatus tcpMessageRCVack = null;
@@ -324,17 +329,17 @@ public class TCPconnection {
         // Keep attempting to send the SYN-ACK packet until it is acknowledged
         attempts = 0;
         lastSentTime = System.nanoTime();
-        tcpMessageRCVack = sendAndWaitForResponse(outTCP, false);
+        sendAndWaitForResponse(outTCP, false);
         long lastReceivedTime = System.nanoTime();
         long maxWaitTime = 30 * 1000000000L; // 30 second in nanoseconds
         while (true) {
-
             // Check if the packet is null
             if (maxWaitTime < (System.nanoTime() - lastReceivedTime)) {
                 System.out.println("No packet received within the timeout period for startup ACK, closing the port and exiting.");
                 return false;
             }
             
+            // Check if there is a timeout to resend
             if (this.timeout.isTimedOut(System.nanoTime(), lastSentTime)) {
                 sendAndWaitForResponse(outTCP, false);
                 lastSentTime = System.nanoTime();
@@ -342,6 +347,7 @@ public class TCPconnection {
                 attempts++;
             }
 
+            // Listen for a response
             tcpMessageRCVack = sendAndWaitForResponse(null, true);
 
             // Check if the packet is null
@@ -356,8 +362,6 @@ public class TCPconnection {
 
         }
 
-        
-
         return true; // Return true to indicate success
     }
 
@@ -370,7 +374,6 @@ public class TCPconnection {
         boolean connectionLost = false;
         TCPmessageStatus inTCP = null;
         TCPmessageStatus outTCP = null;
-        int attempts = 0;
         int position;
         this.finBytSeqNum = 1;
         long lastReceivedTime = System.nanoTime();
@@ -384,11 +387,12 @@ public class TCPconnection {
                 // Loop gathering packets sent
                 while (true) {
                     // Wait for a packet to come in
-                    // Wait for the client to send a packet
                     inTCP = sendAndWaitForResponse(null, true);
+                    // Exit inner loop if the packet is null
                     if (inTCP == null) {
                         break;
-                    } // Drop the packet if it is for establishing a connection
+                    } 
+                    // Drop the packet if it is for establishing a connection, update last received time
                     lastReceivedTime = System.nanoTime();
                     if (inTCP.verifyMessage(1, 1, 0, 0, 1) == true && inTCP.dataLength == 0) {
                         break; // Skip to the next packet
@@ -403,7 +407,7 @@ public class TCPconnection {
                         this.duplicateAcksGlobal++;
                         continue; // Skip to the next packet
                     }
-                    // Check if there is space in message list in
+                    // If the list is empty, add the packet
                     else if (this.messageListIn.size() == 0) {
                         this.messageListIn.add(inTCP);
                     }
@@ -425,7 +429,9 @@ public class TCPconnection {
                         if (position == this.messageListIn.size()) {
                             this.messageListIn.add(inTCP);
                         }
-                    } else {
+                    } 
+                    // If the message list is full, might need to drop packets
+                    else {
                         position = 0;
                         while (position < this.messageListIn.size()) {
                             // Check if the packet is already in the list
@@ -442,13 +448,12 @@ public class TCPconnection {
                         }
                         // Drop the packet
                     }
-
-                    // Any packets that are past the max units will be dropped
                 }
                 
                 // Check if the list in is empty
                 if (this.messageListIn.isEmpty() == true) {
-                } // Check if there is a single FIN packet
+                } 
+                // Check if there is a single FIN packet
                 else if (this.messageListIn.size() == 1) {
                     if(this.messageListIn.get(0).verifyMessage(this.dataTracker.getNextExpectedByte(), 1, 0, 1, 0) == true) {
                     System.out.println("Received FIN packet. Initiating close.");
@@ -457,7 +462,6 @@ public class TCPconnection {
                 }
                 // Loop over the messages that were received
                 while (this.messageListIn.size() > 0) {
-                    attempts = 0;
                     // Check if the first packet has the next expected byte
                     inTCP = this.messageListIn.get(0);
                     if (inTCP.verifyMessage(this.dataTracker.getNextExpectedByte(), 1, 0, 0, 1) == true) {
@@ -474,9 +478,7 @@ public class TCPconnection {
                         break;
                     }
                                 
-                }
-                
-      
+                }      
         
             if (maxWaitTime < (System.nanoTime() - lastReceivedTime)) {
                 System.out.println("No packet received within the timeout period for data, closing the port and exiting.");
@@ -491,7 +493,6 @@ public class TCPconnection {
     // Close out communication for the server
     public boolean serverCloseTCPconnection() {
         // Create a new DatagramPacket to receive the data
-        byte[] buffer = new byte[this.maxBytes];
         TCPmessageStatus inTCP = null;
         int attempts = 0;
         long lastSentTime;
@@ -540,9 +541,7 @@ public class TCPconnection {
      * This method is for when the server is attempting to establish a connection with the client.
      */
     public boolean clientEstablishTCPconnection() {
-        // Create a new DatagramPacket to receive the data
-        byte[] buffer = new byte[this.maxBytes];
-        int attempts = 0;
+        int attempts;
         TCPmessageStatus inTCP = null;
 
         //  Create a new TCP message that is a SYN packet

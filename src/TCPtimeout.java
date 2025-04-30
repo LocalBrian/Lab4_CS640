@@ -9,8 +9,6 @@ public class TCPtimeout {
     private long EDEV;
 
     public TCPtimeout() {
-        // Set default values
-        System.out.println("Timeout of 5 seconds.");
         // 5 seconds in nanoseconds
         this.timeOutTimer = 5 * 1000000000L;
         this.startTime = System.nanoTime();
