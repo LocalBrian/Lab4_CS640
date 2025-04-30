@@ -25,6 +25,7 @@ public class TCPmessageStatus {
     public int dataLength;
     public long timestamp;
     public TCPheader message;
+    public int sendAttempts;
 
     // Possibly unneeded
     // private int overallType; // 0: N/A, 1: Sent, 2: Received
@@ -54,6 +55,7 @@ public class TCPmessageStatus {
         this.SYN = 0;
         this.FIN = 0;
         this.ACK = 0;
+        this.sendAttempts = 0;
     }
 
     /**
@@ -88,6 +90,7 @@ public class TCPmessageStatus {
         this.sent = false;
         this.acknowledged = false;
         this.message = message;
+        this.sendAttempts = 0;
     }
 
     /**
@@ -95,7 +98,7 @@ public class TCPmessageStatus {
      * SYN, FIN, ACK should be 0 or 1
      * @return byte array with the sender startup message
      */
-    public void setDatalessMessage(int eSYN, int eFIN, int eACK) {
+    public void setDatalessMessage(int eSYN, int eFIN, int eACK, long timestamp) {
         
         // Verify the parameters
         if (eSYN < 0 || eSYN > 1) {
@@ -113,8 +116,7 @@ public class TCPmessageStatus {
         this.FIN = eFIN;
         this.ACK = eACK;
 
-        // Get time stamp in nanoseconds
-        long timeStamp = System.nanoTime();
+        this.timestamp = timestamp;
 
         // Generate an empty byte array
         byte[] blankData = new byte[0];
@@ -152,6 +154,16 @@ public class TCPmessageStatus {
         // Generate a TCP message with the data
         TCPheader message = new TCPheader(byteSqnNum,ackNum,timestamp,this.dataLength,this.SYN,this.FIN,this.ACK,data);
         this.message = message;
+    }
+
+
+    /**
+     * Reset the timestamp and the checksum on the message
+     */
+    public void resetMessage() {
+
+        this.message.resetChecksumAndTimestamp();
+        this.timestamp = System.nanoTime();
     }
 
     /**

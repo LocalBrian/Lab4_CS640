@@ -127,6 +127,25 @@ public class TCPheader {
         System.arraycopy(lengthStatusArray, 0, this.fullHeader, 16, lengthStatusArray.length);
     }
 
+    public void resetChecksumAndTimestamp() {
+        // Reset the timestamp to now in nanoseconds
+        this.timestamp = System.nanoTime();
+        // Set the timestamp
+        byte[] timestampArray = convertLongToByte(this.timestamp);
+        System.arraycopy(timestampArray, 0, this.fullHeader, 8, timestampArray.length);
+
+        // Reset the checksum to 0
+        this.checksum = new byte[2];
+        this.checksum[0] = 0;
+        this.checksum[1] = 0;
+        // Set the checksum in the full header
+        System.arraycopy(this.checksum, 0, this.fullHeader, 22, this.checksum.length);
+        // Calculate the checksum
+        this.checksum = calculateChecksum();
+        // Set the checksum in the full header
+        System.arraycopy(this.checksum, 0, this.fullHeader, 22, this.checksum.length);
+    }
+
     /**  
      * Calculate the checksum of the TCP header
      * The checksum is calculated by summing the 16-bit words of the header
@@ -221,6 +240,7 @@ public class TCPheader {
             return false;
         }
     }
+
 
     public int convertByteToInt(byte[] byteArray, int startIndex) {
         // Convert a byte array to an integer
