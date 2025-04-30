@@ -110,6 +110,7 @@ public class TCPconnection {
         this.packetsReceived = 0; // Number of packets received
         this.outOfSequencePacketsDiscarded = 0; // Number of out of sequence packets discarded
         this.badChecksumPacketsDiscarded = 0; // Number of packets discarded due to bad checksum
+        this.retransmissions = 0; // Number of retransmissions
         this.duplicateAcksGlobal = 0; // Number of duplicate ACKs sent
     }
 
@@ -245,6 +246,7 @@ public class TCPconnection {
         System.out.println("Packets received: " + this.packetsReceived);
         System.out.println("Out of sequence packets discarded: " + this.outOfSequencePacketsDiscarded);
         System.out.println("Packets discarded due to incorrect checksum: " + this.badChecksumPacketsDiscarded);
+        System.out.println("Retransmissions: " + this.retransmissions);
         System.out.println("Duplicate ACKs sent: " + this.duplicateAcksGlobal);
     }
 
@@ -254,7 +256,7 @@ public class TCPconnection {
         System.out.println("Packets sent: " + this.packetsSent);
         System.out.println("Packets received: " + this.packetsReceived);
         System.out.println("Out of sequence packets discarded: " + this.outOfSequencePacketsDiscarded);
-        System.out.println("Bad checksum packets discarded: " + this.badChecksumPacketsDiscarded);
+        System.out.println("Packets discarded due to incorrect checksum: " + this.badChecksumPacketsDiscarded);
         System.out.println("Retransmissions: " + this.retransmissions);
         System.out.println("Duplicate ACKs received: " + this.duplicateAcksGlobal);
     }
@@ -330,13 +332,21 @@ public class TCPconnection {
         attempts = 0;
         lastSentTime = System.nanoTime();
         tcpMessageRCVack = sendAndWaitForResponse(outTCP, false);
-        while (attempts < this.maxRetries) {
+        long lastReceivedTime = System.nanoTime();
+        long maxWaitTime = 30 * 1000000000L; // 30 second in nanoseconds
+        while (true) {
+
+            // Check if the packet is null
+            if (maxWaitTime < (System.nanoTime() - lastReceivedTime)) {
+                System.out.println("No packet received within the timeout period for startup ACK, closing the port and exiting.");
+                return false;
+            }
             
             if (this.timeout.isTimedOut(System.nanoTime(), lastSentTime)) {
                 System.out.println("Timeout occurred, resending SYN-ACK packet.");
                 sendAndWaitForResponse(outTCP, false);
                 lastSentTime = System.nanoTime();
-                this.duplicateAcksGlobal++;
+                this.retransmissions++;
                 attempts++;
             }
 
@@ -349,15 +359,12 @@ public class TCPconnection {
             } // Verify the packet is our desired ACK packet
             else if (tcpMessageRCVack.verifyMessage(1, 1, 0, 0, 1)) {
                 break;
-            }       
-        
+            }
+            lastReceivedTime = System.nanoTime();
+
         }
+
         
-        // Check if the packet is null
-        if (attempts == this.maxRetries) {
-            System.out.println("No packet received within the timeout period for startup ACK, closing the port and exiting.");
-            return false;
-        }
 
         return true; // Return true to indicate success
     }
@@ -374,13 +381,13 @@ public class TCPconnection {
         int attempts = 0;
         int position;
         this.finBytSeqNum = 1;
+        long lastReceivedTime = System.nanoTime();
+        long maxWaitTime = 30 * 1000000000L; // 30 second in nanoseconds
 
         // Loop until either a null or a FIN packet is received
         while (connectionLost == false) {
 
             this.messageListIn = new ArrayList <TCPmessageStatus>();
-
-            while (attempts < this.maxRetries) {
                 
                 // Loop gathering packets sent
                 while (true) {
@@ -391,8 +398,10 @@ public class TCPconnection {
                     if (inTCP == null) {
                         break;
                     } // Drop the packet if it is for establishing a connection
-                    else if (inTCP.verifyMessage(1, 1, 0, 0, 1) == true && inTCP.dataLength == 0) {
+                    lastReceivedTime = System.nanoTime();
+                    if (inTCP.verifyMessage(1, 1, 0, 0, 1) == true && inTCP.dataLength == 0) {
                         System.out.println("Received packet is a ACK packet for startup. Dropping.");
+
                         break; // Skip to the next packet
                     }
                     
@@ -469,8 +478,6 @@ public class TCPconnection {
                 // Check if the list in is empty
                 if (this.messageListIn.isEmpty() == true) {
                     System.out.println("No packets received, retrying...");
-                    attempts++;
-                    break; // Retry sending the SYN-ACK packet
                 } // Check if there is a single FIN packet
                 else if (this.messageListIn.size() == 1) {
                     if(this.messageListIn.get(0).verifyMessage(this.dataTracker.getNextExpectedByte(), 1, 0, 1, 0) == true) {
@@ -480,6 +487,7 @@ public class TCPconnection {
                 }
                 // Loop over the messages that were received
                 while (this.messageListIn.size() > 0) {
+                    System.out.println("Processing packets in the list.");
                     attempts = 0;
                     // Check if the first packet has the next expected byte
                     inTCP = this.messageListIn.get(0);
@@ -498,13 +506,12 @@ public class TCPconnection {
                         System.out.println("First packet is not the next expected byte sequence number, checking for more packets.");
                         break;
                     }
-                    
-                
+                                
                 }
-
-            }            
-
-            if (attempts == this.maxRetries) {
+                
+      
+        
+            if (maxWaitTime < (System.nanoTime() - lastReceivedTime)) {
                 System.out.println("No packet received within the timeout period for data, closing the port and exiting.");
                 connectionLost = true;
             }
@@ -521,6 +528,11 @@ public class TCPconnection {
         TCPmessageStatus inTCP = null;
         int attempts = 0;
         long lastSentTime;
+        long lastReceivedTime = System.nanoTime();
+        long maxWaitTime = 30 * 1000000000L; // 30 second in nanoseconds
+
+        // Update the timeout timer
+        this.timeout.setTimeOut(100); // 100 milliseconds
 
         //  Create a new TCP message that is a FIN packet
         TCPmessageStatus outTCP = new TCPmessageStatus(1, this.dataTracker.getNextExpectedByte() +1);
@@ -532,14 +544,13 @@ public class TCPconnection {
         lastSentTime = System.nanoTime();
         sendAndWaitForResponse(outTCP, false);
 
-        while (attempts < this.maxRetries) {
+        while (maxWaitTime > (System.nanoTime() - lastReceivedTime)) {
 
             if (this.timeout.isTimedOut(System.nanoTime(), lastSentTime)) {
-                System.out.println("Timeout occurred, resending FIN-ACK packet.");
                 sendAndWaitForResponse(outTCP, false);
                 lastSentTime = System.nanoTime();
                 attempts++;
-                this.duplicateAcksGlobal++;
+                this.retransmissions++;
             }
             inTCP = sendAndWaitForResponse(null, true);
             // Check if the packet is null
@@ -718,7 +729,6 @@ public class TCPconnection {
 
                     // If the packet is null, break out of this loop
                     if (tcpMessageRCVack == null) {
-                        System.out.println("Breaking out of listening loop, no packet received.");
                         break;
                     } 
 
@@ -836,7 +846,6 @@ public class TCPconnection {
             // Listen for a response
             inTCP = sendAndWaitForResponse(null, true); 
             temp = outTCP.byteSequenceNumber +1;
-            System.out.println("Expected Ack number is " + temp);
 
             // Check if the packet is null
             if (inTCP == null) {
@@ -887,8 +896,7 @@ public class TCPconnection {
      */
     private DatagramPacket createPacket(byte[] data) {
         
-        // Convert data to TCP message
-        TCPmessageStatus tcpMessage = new TCPmessageStatus(data);
+        
         
         // Create a new DatagramPacket with the specified data and address
         try {
@@ -980,10 +988,8 @@ public class TCPconnection {
         try {
             responsePacket = receivePacket(); 
         } catch (IOException e) {
-            System.out.println("Error receiving packet: " + e.getMessage());
             return null;
         } catch (Exception e) {
-            System.out.println("Socket timed out: " + e.getMessage());
             return null;
         }
 
@@ -1015,6 +1021,7 @@ public class TCPconnection {
      * @throws IOException
      */
     private void sendPacket(DatagramPacket packet, TCPmessageStatus tcpMessage) throws IOException {
+            
         // Send the packet using the socket
         this.socket.send(packet);
 
@@ -1042,8 +1049,6 @@ public class TCPconnection {
 
         // Increment counter
         this.packetsReceived++;
-
-        
         
         // Convert to TCPmessageStatus to print received message details
         TCPmessageStatus tcpMessage = new TCPmessageStatus(packet.getData());

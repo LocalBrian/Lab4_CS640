@@ -55,12 +55,6 @@ public class TCPheader {
         // Set the data passed in
         this.fullHeader = fullHeader;
         
-        // Validate the checksum
-        if (this.validateChecksum() == false) {
-            System.out.println("Checksum mismatch");
-            return false;
-        };
-        
         // Parse the received TCP header
         this.byteSequenceNumber = convertByteToInt(fullHeader, 0);
         this.acknowledgmentNumber = convertByteToInt(fullHeader, 4);

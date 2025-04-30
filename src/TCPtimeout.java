@@ -32,14 +32,19 @@ public class TCPtimeout {
         this.timeOutTimer = 2 * this.ERTT;
     }
 
+    public void setTimeOut(long timeOut) { // in milliseconds
+        // Convert milliseconds to nanoseconds
+        timeOut = timeOut * 1000000L;
+        // Set timeout value
+        this.timeOutTimer = timeOut;
+    }
+
     public boolean isTimedOut(long currentTime, long sentTime) {
         long rtt = Math.abs(currentTime - sentTime);
         // Check if the timeout has occurred
         if (rtt > this.timeOutTimer) {
-            System.out.println("Timeout occurred.");
             return true; // Timeout occurred
         } else {
-            System.out.println("No timeout.");
             return false; // No timeout
         }
         
