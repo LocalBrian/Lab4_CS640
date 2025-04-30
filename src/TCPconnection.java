@@ -400,6 +400,7 @@ public class TCPconnection {
                         outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                         outTCP.setDatalessMessage(0, 0, 1, inTCP.timestamp); // SYN = 0, ACK = 1, FIN = 0
                         this.sendAndWaitForResponse(outTCP, false);
+                        System.out.println("Duplicate packet received. Sending ACK for byte sequence number " + outTCP.acknowledgmentNumber);
                         this.duplicateAcksGlobal++;
                         continue; // Skip to the next packet
                     }
@@ -980,6 +981,11 @@ public class TCPconnection {
 
         // Receive the packet using the socket
         this.socket.receive(packet);
+
+        // 10% chance to drop packet
+        if (Math.random() < 0.1) {
+            return null; // Drop the packet
+        }
 
         // Increment counter
         this.packetsReceived++;

@@ -39,6 +39,7 @@ public class TCPdataTracker {
         // Initialize the data tracker
         this.fileHandler = fileHandler;
         this.expectedChunkSize = chunkSize;
+        this.completedData = new ArrayList<>();
 
         if (isSender) {
             // Initialize sender attributes
@@ -47,7 +48,6 @@ public class TCPdataTracker {
             this.lastByteSent = 0;
             this.maxSendBuffer = maxBuffer;
             this.currentChunkSize = 0;
-            this.completedData = new ArrayList<>();
         } else {
             // Initialize receiver attributes
             this.lastByteRead = 0;
@@ -140,8 +140,8 @@ public class TCPdataTracker {
             return false; // No data has been acknowledged yet
         }
         // Check if the ack number is in the list
-        for (int i = 0; i < this.completedData.size(); i++) {
-            if (this.completedData.get(i) == ackNumber) {
+        for (int testAck : this.completedData) {
+            if (testAck == ackNumber) {
                 return true;
             }
         }
