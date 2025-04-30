@@ -340,7 +340,7 @@ public class TCPconnection {
                     if (this.dataTracker.isDataReceived(inTCP.byteSequenceNumber)) {
                         System.out.println("Packet already received, skipping.");
                         // Send an ACK packet back to the client
-                        outTCP = new TCPmessageStatus(inTCP.byteSequenceNumber + inTCP.dataLength, 1);
+                        outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                         outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
                         this.sendAndWaitForResponse(outTCP, false);
                         continue; // Skip to the next packet
@@ -358,7 +358,7 @@ public class TCPconnection {
                             // Check if the packet is already in the list
                             if (inTCP.byteSequenceNumber == this.messageListIn.get(position).byteSequenceNumber) {
                                 System.out.println("Packet already in list, skipping.");
-                                outTCP = new TCPmessageStatus(inTCP.byteSequenceNumber + inTCP.dataLength, 1);
+                                outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                                 outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
                                 this.sendAndWaitForResponse(outTCP, false);
                                 break; // Skip to the next message
@@ -382,7 +382,7 @@ public class TCPconnection {
                             // Check if the packet is already in the list
                             if (inTCP.byteSequenceNumber == this.messageListIn.get(position).byteSequenceNumber) {
                                 System.out.println("Packet already in list, skipping.");
-                                outTCP = new TCPmessageStatus(inTCP.byteSequenceNumber + inTCP.dataLength, 1);
+                                outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                                 outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
                                 this.sendAndWaitForResponse(outTCP, false);
                                 break; // Skip to the next message
@@ -423,7 +423,7 @@ public class TCPconnection {
                         // Process the received data bytes
                         this.dataTracker.receiverAddData(inTCP.byteSequenceNumber, inTCP.dataLength, inTCP.getMessage());
                         // Send an ACK packet back to the client
-                        outTCP = new TCPmessageStatus(inTCP.byteSequenceNumber + inTCP.dataLength, 1);
+                        outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                         outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
                         this.sendAndWaitForResponse(outTCP, false);
                         // Remove the processed packet from the list
@@ -569,6 +569,7 @@ public class TCPconnection {
                     } 
                     // See if it matches one of the messages we sent
                     for (TCPmessageStatus message : this.messageListOut) {
+                        System.out.println("Checking message: " + message.byteSequenceNumber + message.dataLength);
                         if (tcpMessageRCVack.verifyMessage( 1, message.byteSequenceNumber + message.dataLength, 0, 0, 1) == true) {
                             // Check if the message is already acknowledged
                             if (message.isAcknowledged() == true) {
@@ -584,6 +585,8 @@ public class TCPconnection {
                         }
 
                     }
+                    System.out.println("Active messages acknowledged: " + activeMessagesAcked);
+                    System.out.println("Total messages sent: " + this.messageListOut.size());
                     if (activeMessagesAcked == this.messageListOut.size()) {
                         System.out.println("All messages acknowledged.");
                         break; // Exit the loop if all messages are acknowledged
