@@ -441,6 +441,13 @@ public class TCPconnection {
                         outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                         outTCP.setDatalessMessage(0, 0, 1, inTCP.timestamp); // SYN = 0, ACK = 1, FIN = 0
                         this.sendAndWaitForResponse(outTCP, false);
+                        // // 30% chance to send in triplicate
+                        // if (Math.random() < 0.1) {
+                        //     System.out.println("Sending ACK in triplicate.");
+                        //     this.sendAndWaitForResponse(outTCP, false);
+                        //     this.sendAndWaitForResponse(outTCP, false);
+                        //     this.sendAndWaitForResponse(outTCP, false);
+                        // }
                         // Remove the processed packet from the list
                         this.messageListIn.remove(0);
                     } else {
@@ -720,6 +727,7 @@ public class TCPconnection {
                                 sendAndWaitForResponse(activeMessage, false);
                                 // Replace the message in the list
                                 this.messageListOut.set(count, activeMessage);
+                                count++;
                             }
                             duplicateAckCount = 0;
                         }
@@ -737,6 +745,7 @@ public class TCPconnection {
                         currentWindow = Math.min(currentWindow /2, this.maxUnits);
                         currentWindow = Math.max(currentWindow, 1);
                     }
+                    resendOccurred = false;
                     // All messages have been acknowledged, break out of the loop
                     break;
                 }
@@ -982,11 +991,11 @@ public class TCPconnection {
         // Receive the packet using the socket
         this.socket.receive(packet);
 
-        // There is a random 1 in 10 chance that the packet is dropped to simulate a lost packet
-        if (Math.random() < 0.05) { 
-            System.out.println("Simulated packet loss, dropping packet.");
-            return null; // Simulate packet loss
-        }
+        // // There is a random 1 in 10 chance that the packet is dropped to simulate a lost packet
+        // if (Math.random() < 0.00) { 
+        //     System.out.println("Simulated packet loss, dropping packet.");
+        //     return null; // Simulate packet loss
+        // }
         
         // Convert to TCPmessageStatus to print received message details
         TCPmessageStatus tcpMessage = new TCPmessageStatus(packet.getData());
