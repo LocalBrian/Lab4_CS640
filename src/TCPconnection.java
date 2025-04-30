@@ -188,9 +188,6 @@ public class TCPconnection {
 
         // Terminate the TCP connection        
         this.endTCPcommunication();
-
-        // Important comment for reminder
-        System.out.println("THIS PROGRAM CURRENTLY DROPS PACKETS, CHANGE THAT BEFORE SUBMISSION.");
         
         return true; // Return true to indicate completion
     }
@@ -441,13 +438,6 @@ public class TCPconnection {
                         outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
                         outTCP.setDatalessMessage(0, 0, 1, inTCP.timestamp); // SYN = 0, ACK = 1, FIN = 0
                         this.sendAndWaitForResponse(outTCP, false);
-                        // // 30% chance to send in triplicate
-                        // if (Math.random() < 0.1) {
-                        //     System.out.println("Sending ACK in triplicate.");
-                        //     this.sendAndWaitForResponse(outTCP, false);
-                        //     this.sendAndWaitForResponse(outTCP, false);
-                        //     this.sendAndWaitForResponse(outTCP, false);
-                        // }
                         // Remove the processed packet from the list
                         this.messageListIn.remove(0);
                     } else {
@@ -990,12 +980,6 @@ public class TCPconnection {
 
         // Receive the packet using the socket
         this.socket.receive(packet);
-
-        // // There is a random 1 in 10 chance that the packet is dropped to simulate a lost packet
-        // if (Math.random() < 0.00) { 
-        //     System.out.println("Simulated packet loss, dropping packet.");
-        //     return null; // Simulate packet loss
-        // }
         
         // Convert to TCPmessageStatus to print received message details
         TCPmessageStatus tcpMessage = new TCPmessageStatus(packet.getData());
