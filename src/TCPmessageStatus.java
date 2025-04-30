@@ -3,15 +3,6 @@ import java.lang.StringBuilder;
 
 public class TCPmessageStatus {
 
-    // Status type list and int value
-    // public static final int STATUS_TYPE = 0;
-    // public static final int STATUS_TYPE_ACK = 1;
-    // public static final int STATUS_TYPE_NACK = 2;
-    // public static final int STATUS_TYPE_DATA = 3;
-    // public static final int STATUS_TYPE_DATA_ACK = 4;
-    // public static final int STATUS_TYPE_DATA_NACK = 5;
-
-
     // Other parameters
     public boolean sent;
     public boolean received;
@@ -26,11 +17,6 @@ public class TCPmessageStatus {
     public long timestamp;
     public TCPheader message;
     public int sendAttempts;
-
-    // Possibly unneeded
-    // private int overallType; // 0: N/A, 1: Sent, 2: Received
-    // private int statusType; // 0: N/A, 1: ACK, 2: NACK, 3: DATA, 4: DATA_ACK, 5: DATA_NACK
-    // private long sentTime;
 
     /**
      * Generates a message to start with
