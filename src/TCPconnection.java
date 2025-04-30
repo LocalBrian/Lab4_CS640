@@ -107,6 +107,12 @@ public class TCPconnection {
 
         // Establish the TCP connection
         if (this.TCPmode == TCP_sender) {
+            // Set the socket timer to 80 milliseconds
+            try {
+                this.socket.setSoTimeout(250);
+            } catch (SocketException e) {
+                System.out.println("Error setting socket timeout: " + e.getMessage());
+            }
             // Client mode
             System.out.println("Establishing TCP connection to " + this.targetIPAddress + ":" + this.targetPort + "...");
             if (!clientEstablishTCPconnection()) {
@@ -119,6 +125,12 @@ public class TCPconnection {
             this.dataTracker = new TCPdataTracker(true, this.maxUnitSize, this.maxUnits, this.fileHandler);
 
         } else if (this.TCPmode == TCP_receiver) {
+            // Set the socket timer to 50 milliseconds
+            try {
+                this.socket.setSoTimeout(200);
+            } catch (SocketException e) {
+                System.out.println("Error setting socket timeout: " + e.getMessage());
+            }
             // Server mode
             System.out.println("Waiting for incoming TCP connection on port " + this.communicationPort + "...");
             if (!serverOpenListeningState()) {
@@ -304,6 +316,8 @@ public class TCPconnection {
         TCPmessageStatus inTCP = null;
         TCPmessageStatus outTCP = null;
         int attempts = 0;
+        int position;
+        this.finBytSeqNum = 1;
 
         // Loop until either a null or a FIN packet is received
         while (connectionLost == false) {
@@ -322,11 +336,69 @@ public class TCPconnection {
                         break;
                     }
                     System.out.println("Received packet.");
+                    // Check if the packet has previously been received
+                    if (this.dataTracker.isDataReceived(inTCP.byteSequenceNumber)) {
+                        System.out.println("Packet already received, skipping.");
+                        // Send an ACK packet back to the client
+                        outTCP = new TCPmessageStatus(inTCP.byteSequenceNumber + inTCP.dataLength, 1);
+                        outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
+                        this.sendAndWaitForResponse(outTCP, false);
+                        continue; // Skip to the next packet
+                    }
                     // Check if there is space in message list in
-                    if (this.messageListIn.size() < this.maxUnits) {
-                        System.out.println("Space for the data, storing packet.");
+                    else if (this.messageListIn.size() == 0) {
+                        System.out.println("First packet received in round, storing packet.");
                         this.messageListIn.add(inTCP);
                     }
+                    // Check if there is space in message list in
+                    else if (this.messageListIn.size() < this.maxUnits) {
+                        System.out.println("Space for the data, storing packet.");
+                        position = 0;
+                        while (position < this.messageListIn.size()) {
+                            // Check if the packet is already in the list
+                            if (inTCP.byteSequenceNumber == this.messageListIn.get(position).byteSequenceNumber) {
+                                System.out.println("Packet already in list, skipping.");
+                                outTCP = new TCPmessageStatus(inTCP.byteSequenceNumber + inTCP.dataLength, 1);
+                                outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
+                                this.sendAndWaitForResponse(outTCP, false);
+                                break; // Skip to the next message
+                            } else if (inTCP.byteSequenceNumber < this.messageListIn.get(position).byteSequenceNumber) {
+                                System.out.println("Packet is before the current packet, inserting.");
+                                this.messageListIn.add(position, inTCP);
+                                break; // Exit the loop if the packet is inserted
+                            } else {
+                                position++;
+                            }
+                        }
+                        // If the packet is not inserted, add it to the end of the list
+                        if (position == this.messageListIn.size()) {
+                            System.out.println("Packet is highest byte sequence number, adding to end of list.");
+                            this.messageListIn.add(inTCP);
+                        }
+                    } else {
+                        System.out.println("Storage full, seeing if will be inserted.");
+                        position = 0;
+                        while (position < this.messageListIn.size()) {
+                            // Check if the packet is already in the list
+                            if (inTCP.byteSequenceNumber == this.messageListIn.get(position).byteSequenceNumber) {
+                                System.out.println("Packet already in list, skipping.");
+                                outTCP = new TCPmessageStatus(inTCP.byteSequenceNumber + inTCP.dataLength, 1);
+                                outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
+                                this.sendAndWaitForResponse(outTCP, false);
+                                break; // Skip to the next message
+                            } else if (inTCP.byteSequenceNumber < this.messageListIn.get(position).byteSequenceNumber) {
+                                System.out.println("Packet is before the current packet, inserting and popping back item.");
+                                this.messageListIn.remove(this.messageListIn.size() - 1); // Remove the last item
+                                this.messageListIn.add(position, inTCP);
+                                break; // Exit the loop if the packet is inserted
+                            } else {
+                                position++;
+                            }
+                        }
+                        // Drop the packet
+                        System.out.println("Packet is after the biggest packet or already received, dropping.");
+                    }
+
                     // Any packets that are past the max units will be dropped
                 }
                 
@@ -343,26 +415,26 @@ public class TCPconnection {
                     }
                 }
                 // Loop over the messages that were received
-                for (TCPmessageStatus message : this.messageListIn) {
-                    // Check if the packet is previously received
-                    if (this.dataTracker.isDataReceived(inTCP.byteSequenceNumber)) {
-                        // Send an ACK packet to the client
-                        outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
-                        outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
-                        // Send the ACK packet to the client
-                        sendAndWaitForResponse(outTCP, false); // Don't wait for a response
-                        attempts = 0; // Reset the attempts counter something was received
-                    }
-                    // Check if the packet is a data packet -- this needs configured for what to look for
-                    else if (inTCP.verifyMessage(this.dataTracker.getNextExpectedByte() + 1, 1, 0, 0, 1) == true) {
+                while (this.messageListIn.size() > 0) {
+                    // Check if the first packet has the next expected byte
+                    inTCP = this.messageListIn.get(0);
+                    if (inTCP.verifyMessage(this.dataTracker.getNextExpectedByte(), 1, 0, 0, 1) == true) {
+                        System.out.println("Received next expectecd packet, processing.");
                         // Process the received data bytes
                         this.dataTracker.receiverAddData(inTCP.byteSequenceNumber, inTCP.dataLength, inTCP.getMessage());
-                        // Acknowledge the received data
-                        outTCP = new TCPmessageStatus(1, inTCP.byteSequenceNumber + inTCP.dataLength);
+                        // Send an ACK packet back to the client
+                        outTCP = new TCPmessageStatus(inTCP.byteSequenceNumber + inTCP.dataLength, 1);
                         outTCP.setDatalessMessage(0, 0, 1); // SYN = 0, ACK = 1, FIN = 0
-                        sendAndWaitForResponse(outTCP, false); // Don't wait for a response
-
+                        this.sendAndWaitForResponse(outTCP, false);
+                        // Remove the processed packet from the list
+                        this.messageListIn.remove(0);
+                    } else {
+                        // The first packet isn't what we want - listen for more packets
+                        System.out.println("First packet is not the next expected byte sequence number, checking for more packets.");
+                        break;
                     }
+                    
+                
                 }
 
             }            
@@ -772,11 +844,6 @@ public class TCPconnection {
      * @throws IOException
      */
     private DatagramPacket receivePacket() throws IOException {
-
-        // Set the timeOut for this listen
-        System.out.println("Setting timeout to " + this.timeout.getTimeOut() + " milliseconds.");
-        this.socket.setSoTimeout(this.timeout.getTimeOut());
-        System.out.println("The socket has a timeout setting of: " + this.socket.getSoTimeout() + " milliseconds.");
         
         // Create datagram packet to receive data
         byte[] buffer = new byte[this.maxBytes];

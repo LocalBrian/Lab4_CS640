@@ -20,11 +20,6 @@ public class TCPtimeout {
         this.timeOutTimer = timeOut;
     }
 
-    public int getTimeOut() {
-        // Get timeout value
-        return this.timeOutTimer;
-    }
-
     public long getStartTime() {
         // Get start time
         return this.startTime;

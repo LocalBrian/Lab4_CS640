@@ -49,8 +49,9 @@ public class TCPdataTracker {
         } else {
             // Initialize receiver attributes
             this.lastByteRead = 0;
-            this.lastByteRcvd = 0;
+            this.lastByteRcvd = 1;
             this.maxRcvBuffer = maxBuffer;
+            this.startPoints = new ArrayList<>();
         }        
     }
 
