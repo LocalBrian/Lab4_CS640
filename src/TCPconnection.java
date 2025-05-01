@@ -611,6 +611,7 @@ public class TCPconnection {
         int activeMessagesAcked;
         boolean resendOccurred = false;
         int duplicateAckCount = 0;
+        boolean noFailures = true;
         
 
         // Loop until either a null or a FIN packet is received
@@ -740,10 +741,16 @@ public class TCPconnection {
                 if (0 == this.messageListOut.size()) {
                     // If the first attempt, then increase the window size
                     if (resendOccurred == false) {
-                        currentWindow = Math.min(currentWindow *2, this.maxUnits);
+                        if (noFailures) {
+                            currentWindow = Math.min(currentWindow *2, this.maxUnits);
+                        } else {
+                            currentWindow = Math.min(currentWindow +1, this.maxUnits);
+                        }
+                        
                     } else {
                         currentWindow = Math.min(currentWindow /2, this.maxUnits);
                         currentWindow = Math.max(currentWindow, 1);
+                        noFailures = false;
                     }
                     resendOccurred = false;
                     // All messages have been acknowledged, break out of the loop
